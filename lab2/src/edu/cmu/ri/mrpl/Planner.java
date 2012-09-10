@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
+import edu.cmu.ri.mrpl.util.Pair;
 import static edu.cmu.ri.mrpl.RobotModel.*;
 import static java.lang.Math.*;
 

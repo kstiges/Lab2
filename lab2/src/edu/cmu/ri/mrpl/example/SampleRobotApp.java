@@ -16,6 +16,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Area;
+import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 
 import javax.swing.*;
@@ -27,7 +28,9 @@ import edu.cmu.ri.mrpl.gui.PointsConsole;
 import edu.cmu.ri.mrpl.kinematics2D.Angle;
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
+import edu.cmu.ri.mrpl.util.Pair;
 import static edu.cmu.ri.mrpl.RobotModel.*;
+import edu.cmu.ri.mrpl.util.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
 
@@ -378,18 +381,33 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			//showSC();
 			robot.turnSonarsOn();
 			
+			CircularArrayList<Point2D> worldPoints
+				= new CircularArrayList<Point2D>(NUM_SONARS*10);
+			
 			double[] sonars = new double[NUM_SONARS];
 			while(!shouldStop()) {
 				robot.updateState();
 				robot.getSonars(sonars);
 				
-				pc.setReference(new RealPose2D(robot.getPosX(),robot.getPosY(),robot.getHeading()));
+				pc.clear();
+				
+				RealPose2D robotRelWorld = new RealPose2D(robot.getPosX(),robot.getPosY(),robot.getHeading());
 				for( int i = 0; i < sonars.length; ++i){
-					RealPose2D sonar = new RealPose2D(sonars[i],0.0,0.0);
-					RealPose2D sonarToRobot = sonarPose(i);
-					pc.addPoint(RealPose2D.multiply(sonarToRobot, sonar));
+					RealPoint2D obstacleRelSonar = new RealPoint2D(sonars[i],0.0);
+					RealPose2D sonarRelRobot = sonarPose(i);
+					Point2D obstacleRelRobot = sonarRelRobot.transform(obstacleRelSonar, null);
+					Point2D obstacleRelWorld = robotRelWorld.transform(obstacleRelRobot, null);
+					// XXX does this overwrite the same sensor
+					// since the capacity is a multiple of NUM_SONARS?
+					worldPoints.add(obstacleRelWorld);
 				}
-				pc.drawAll(robot, RobotModel.ROBOT_RADIUS);
+				pc.drawRobot(robot, ROBOT_RADIUS);
+				for (Point2D point : worldPoints) {
+					if (point == null) {
+						continue;
+					}
+					pc.drawPoint(new RealPose2D(robotRelWorld.inverseTransform(point, null), 0));
+				}
 				
 				try {
 					Thread.sleep(50);

@@ -1,4 +1,4 @@
-package edu.cmu.ri.mrpl;
+package edu.cmu.ri.mrpl.util;
 
 public class Pair<A, B> {
     private A first;
