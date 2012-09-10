@@ -5,10 +5,12 @@ import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Rectangle2D;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Map;
 
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import static edu.cmu.ri.mrpl.RobotModel.*;
+import static java.lang.Math.*;
 
 public class Planner {
 	/* returns array of n curvatures from -1 to 1 */
@@ -23,6 +25,7 @@ public class Planner {
 		for(int i = 0; i < n; i++)
 		{
 			result[i] = min + (double)i*diff/(n-1);
+			System.out.println(i + "th curvature: " + result[i]);
 		}
 		
 		return result;
@@ -30,9 +33,9 @@ public class Planner {
 	
 	public static Area curvatureToArea (double curvature)
 	{
-		double radius = Math.abs(1.0/curvature);
+		double radius = abs(1.0/curvature);
 		double arclength = 0.03;
-		double theta = 360/(2.0*Math.PI*radius/arclength);
+		double theta = 360/(2.0*PI*radius/arclength);
 		Polygon wedge = new Polygon();
 		double wedgeSize = 999;
 		Area obstacle = null;
@@ -44,7 +47,7 @@ public class Planner {
 		wedge.addPoint((int) rightCorner.x, (int) rightCorner.y);
 		if(curvature > 0) {
 			RealPoint2D boundingPoint = new RealPoint2D(wedgeSize
-					/ Math.tan(theta), wedgeSize);
+					/ tan(theta), wedgeSize);
 			wedge.addPoint((int) boundingPoint.x, (int) boundingPoint.y);
 
 			obstacle = new Area(new Ellipse2D.Double(-radius, 0,
@@ -54,7 +57,7 @@ public class Planner {
 			obstacle.intersect(new Area(wedge));
 		}
 		else if (curvature < 0) {
-			RealPoint2D boundingPoint = new RealPoint2D(wedgeSize/Math.tan(theta), -wedgeSize);
+			RealPoint2D boundingPoint = new RealPoint2D(wedgeSize/tan(theta), -wedgeSize);
 			wedge.addPoint((int) boundingPoint.x, (int) boundingPoint.y);
 
 			obstacle = new Area(new Ellipse2D.Double(-radius, -2*radius,
@@ -80,19 +83,15 @@ public class Planner {
 		return result;
 	}
 	
-	public static Comparator<Pair<Double, Area>> curvPathComparator = new Comparator<Pair<Double, Area>>() {
-		public int compare(Pair<Double, Area> o1, Pair<Double, Area> o2) {
-			return 0;
-		}
-	};
-	
 	public static class CurvPathComparator implements Comparator<Pair<Double, Area>> {
 		private double currentCurvature;
 		private Area[] cSpaceObstacles;
+		private Map<Area, Double> minCollisionDistances;
 		
 		public CurvPathComparator (double currentCurvature, Area[] cSpaceObstacles) {
 			this.currentCurvature = currentCurvature;
 			this.cSpaceObstacles = cSpaceObstacles;
+			minCollisionDistances = new HashMap<Area, Double>();
 		}
 		
 		private double getCollisionDistance (Area path, Area obstacle) {
@@ -102,17 +101,22 @@ public class Planner {
 			if (bound.isEmpty()) {
 				return _maxSonarRange;
 			}
-			double x = bound.getCenterX();
-			double y = bound.getCenterY();
-			double dist = Math.sqrt(x*x + y*y);
+			// find distance to corner closest to origin
+			double x = min(abs(bound.getMaxX()), abs(bound.getMinX()));
+			double y = min(abs(bound.getMaxY()), abs(bound.getMinY()));
+			double dist = sqrt(x*x + y*y);
 			return dist;
 		}
 		
 		public double getMinCollisionDistance (Area path) {
-			double dist = Double.MAX_VALUE; // TODO change this to something else, maybe the distance just beyond the path?
-			for (int i = 0; i < cSpaceObstacles.length; i++) {
-				dist = Math.min(dist, getCollisionDistance(path, cSpaceObstacles[i]));
+			if (minCollisionDistances.containsKey(path)) {
+				return minCollisionDistances.get(path);
 			}
+			double dist = Double.MAX_VALUE;
+			for (int i = 0; i < cSpaceObstacles.length; i++) {
+				dist = min(dist, getCollisionDistance(path, cSpaceObstacles[i]));
+			}
+			minCollisionDistances.put(path, dist);
 			return dist;
 		}
 		
@@ -123,29 +127,36 @@ public class Planner {
 			double p1coll = getMinCollisionDistance(a1);
 			double p2coll = getMinCollisionDistance(a2);
 			
-			double collisionDiff = Math.abs(p2coll - p1coll);
+			double collisionDiff = abs(p2coll - p1coll);
 			final double TOLERANCE = 0.25;
 			
-			double p1diff = Math.abs(currentCurvature - p1.getFirst());
-			double p2diff = Math.abs(currentCurvature - p2.getFirst());
+			double p1diff = abs(p1.getFirst());
+			double p2diff = abs(p2.getFirst());
 			
 			if (collisionDiff < TOLERANCE) {
 				if (p1diff < p2diff) {
 					return -1;
 				}
-				else {
+				else if (p2diff < p1diff) {
 					return 1;
+				}
+				else {
+					return 0;
 				}
 			}
 			else if (p1coll > p2coll) {
 				return -1;
 			}
-			else {
+			else if (p2coll > p1coll) {
 				return 1;
+			}
+			else {
+				return 0;
 			}
 		}
 	}
 	
+	/*
 	public static double[] getGoodCurves (double[] curves, Area[] curvesAreas, Area[] obstacles)
 	{
 		double[] result;
@@ -179,9 +190,6 @@ public class Planner {
 	
 	
 	
-	
-	
-/*
 	public int obstacleInTheWay() {
 		int sensorIndex = 0;
 		Area[] obstacles = getCSpaceObstacles();

@@ -10,14 +10,20 @@ public class Controller {
 		this.robot = robot;
 	}
 	
+	public void setVel (double leftVel, double rightVel) {
+		// clamp values
+		leftVel = Math.min(leftVel, MAX_SPEED);
+		rightVel = Math.min(rightVel, MAX_SPEED);
+		robot.setVel(leftVel, rightVel);
+	}
+	
 	public void setCurvVel (double curv, double speed) {
-		speed = Math.min(speed, MAX_SPEED);
 		double angularVelocity = curv*speed;
 		
 		double rightVel = speed + angularVelocity*ROBOT_RADIUS;
 		double leftVel = speed - angularVelocity*ROBOT_RADIUS;
 		
-		robot.setVel(leftVel, rightVel);
+		setVel(leftVel, rightVel);
 	}
 	
 	public void chooseCurvedPath (Perceptor perceptor, int obstacleDirection) {

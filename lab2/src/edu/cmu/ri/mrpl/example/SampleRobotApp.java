@@ -159,8 +159,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		f.setVisible(true);
 		f.setLocation(200, 200);
 
+		//*
 		robot = new SimRobot();
-		//robot = new ScoutRobot();
+		/*/
+		robot = new ScoutRobot();
+		//*/
 	}
 
 	// call from GUI thread
@@ -182,7 +185,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			ioex.printStackTrace();
 		}
 	}
-
 
 	// call from GUI thread
 	public synchronized void stop() {
@@ -277,7 +279,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		});
 	}
 
-
 	// here we implement the different robot controllers
 	// as Tasks
 	//
@@ -292,28 +293,24 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 
 		public void taskRun() {
-			final double MAX_VEL = .5; // meters/sec
 			robot.turnSonarsOn();
 			
 			perceptor = new Perceptor(robot);
 			controller = new Controller(robot);
+			
+			final double[] curves = Planner.curvatureRange(11);
+			final Pair<Double, Area>[] curvesAreas = Planner.curvaturesToAreas(curves);
 
 			while(!shouldStop()) {
-				// JT
-				double[] curves = Planner.curvatureRange(11);
-				Pair<Double, Area>[] curvesAreas = Planner.curvaturesToAreas(curves);
-				// JT
+				
+				robot.updateState();
+				Area[] cSpaceObstacles = perceptor.getCSpaceObstacles();
+				
+				/* XXX draws obstacles and paths
+				pc.clear();
 				double scaleFactor = 50;
 				int width = pc.getPanel().getWidth();
 				int height = pc.getPanel().getHeight();
-				
-				robot.updateState();
-				
-				Area[] cSpaceObstacles = perceptor.getCSpaceObstacles();
-				
-				pc.clear();
-				
-				/* XXX remove me?
 				for (int i = 0; i < NUM_SONARS; i++) {
 					Area a = (Area) cSpaceObstacles[i].clone();
 
@@ -330,63 +327,33 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					c.transform(AffineTransform.getTranslateInstance(width/2, height/2));
 					((Graphics2D) pc.getPanel().getGraphics()).draw(c);
 				}
-				*/
+				//*/
 				
 				double currentCurvature = perceptor.getCurvature();
 				CurvPathComparator cmp = new Planner.CurvPathComparator(currentCurvature, cSpaceObstacles);
 				Arrays.sort(curvesAreas, cmp);
-				for (Pair<Double, Area> path : curvesAreas) {
-					double k = path.getFirst();
-					Area a = path.getSecond();
-					double dist = cmp.getMinCollisionDistance(a);
-					if (dist != 0) {
-						//System.out.println(k + ": " + dist);
-					}
+				
+				double maxMinCollisionDistance = -1;
+				for (Pair<Double, Area> curvPath : curvesAreas) {
+					maxMinCollisionDistance = Math.max(maxMinCollisionDistance,
+							cmp.getMinCollisionDistance(curvPath.getSecond()));
 				}
 				
-				int curvIndex = Math.random() > .5 ? 1 : 0;
-				controller.setCurvVel(curvesAreas[curvIndex].getFirst(), 0.5);
-				
-				/*
-				double newCurve = Double.MAX_VALUE;
-				for(double gc: goodCurves)
-				{
-					System.out.println(currentCurvature);
-					System.out.println(Math.abs(gc - currentCurvature));
-					System.out.println(Math.abs(newCurve - currentCurvature));
-					System.out.println();
-					if(Math.abs(gc - currentCurvature) < Math.abs(newCurve - currentCurvature)) {
-						System.out.println("here");
-						newCurve = gc;
-					}
+				if (maxMinCollisionDistance > ROBOT_RADIUS) {
+					int curvIndex = 0;
+					final double vel = 0.25;
+					controller.setCurvVel(curvesAreas[curvIndex].getFirst(), vel);
+					//System.out.println("paths dont suck, collision distance is: " + minMinCollisionDistance);
 				}
-
-				if(goodCurves.length == 0)
-				{
-					System.out.println("no good curves, turning around");
-					robot.setVel(0.05/2, -0.05/2);
+				else {
+					final double spinSpeed = 0.1;
+					// turn around because all the paths suck
+					controller.setVel(spinSpeed, -spinSpeed);
+					System.out.println("turning around because all the paths suck."
+							+ " Collision Distance is: " + maxMinCollisionDistance);
 				}
-				else
-				{
-					controller.setCurvVel(newCurve, 0.5);
-				}
-				//*/
-				
-				
-				/*
-				int directionOfObstacle = perceptor.obstacleInTheWay();
-				
-				if (directionOfObstacle != -1) { 
-					// choose a curved path if there is an obstacle in the way
-					controller.chooseCurvedPath(perceptor, directionOfObstacle);
-				} else {
-					// continue in a straight line until there is an obstacle
-					robot.setVel(MAX_VEL, MAX_VEL);
-				}
-				*/
 				try {
 					Thread.sleep(50);
-					//break; // XXX remove me
 				} catch(InterruptedException iex) {
 					System.out.println("reactive wanderer sleep interrupted");
 				}
@@ -399,42 +366,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		public String toString() {
 			return "sample program";
 		}
-	}
-	private int findClosest (double[] sonars) {
-		// find closest object
-		int minIndex = 0;
-		double minValue = Double.MAX_VALUE;
-		for (int i = 0; i < NUM_SONARS; i++) {
-			if (sonars[i] < minValue) {
-				minIndex = i;
-				minValue = sonars[i];
-			}
-		}
-		return minIndex;
-	}
-	
-	private int turnTowardsSensor (int sensor) {
-		if (sensor > 1 && sensor < 15) {
-		//if (minIndex != 0) {
-			double direction = 1/(sensor - 7.5);
-			final double SPEED_FACTOR = 1;
-			final double MAX_SPEED = 1.5;
-			double speed = direction*SPEED_FACTOR;
-			if (Math.abs(speed) > MAX_SPEED)
-				speed = MAX_SPEED * Math.signum(speed);
-			robot.setVel(speed, -speed);
-		}
-		else if (sensor == 1) {
-			robot.setVel(-.1, .1);
-		}
-		else if (sensor == 15) {
-			robot.setVel(.1, -.1);
-		}
-		else {
-			System.err.println("minIndex is 0");
-			robot.setVel(0, 0);
-		}
-		return sensor;
 	}
 
 	class StatefulVisualizationTask extends Task {

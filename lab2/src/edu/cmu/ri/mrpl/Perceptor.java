@@ -1,12 +1,8 @@
 package edu.cmu.ri.mrpl;
 
-import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
-import java.awt.geom.Rectangle2D;
-import java.awt.geom.Rectangle2D.Double;
 
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import static edu.cmu.ri.mrpl.RobotModel.*;
@@ -44,17 +40,19 @@ public class Perceptor {
 		Area[] result = new Area[NUM_SONARS];
 		double[] sonars = new double[NUM_SONARS];
 		robot.getSonars(sonars);
+		
+		final double PADDING = 1*ROBOT_RADIUS;
 
 		for (int i = 0; i < NUM_SONARS; i++) {
 			double sonarDistance = sonars[i];
-			double closeDistance = sonarDistance; // do we need to take the
-													// radius of the robot into
-													// consideration here/
-			double farDistance = closeDistance + 2 * ROBOT_RADIUS;
+			double robotDistance = sonarDistance + ROBOT_RADIUS;
+			double closeDistance = robotDistance - PADDING;
+			double farDistance = robotDistance + PADDING;
 
 			double sonarAngle = i * SONAR_RADIANS;
-			double leftEdgeAngle = sonarAngle + SONAR_WIDTH / 2;
-			double rightEdgeAngle = leftEdgeAngle - SONAR_WIDTH;
+			double radiusAngle = Math.atan2(PADDING, sonarDistance);
+			double leftEdgeAngle = sonarAngle + SONAR_WIDTH / 2 + radiusAngle;
+			double rightEdgeAngle = sonarAngle - SONAR_WIDTH / 2 - radiusAngle;
 
 			Polygon wedge = new Polygon();
 			wedge.addPoint(0, 0);
@@ -85,10 +83,10 @@ public class Perceptor {
 	public double getCurvature() {
 		double leftVel = robot.getVelLeft();
 		double rightVel = robot.getVelRight();
-		if (leftVel == 0 && rightVel == 0) {
+		double vel = (leftVel + rightVel) / 2;
+		if (vel == 0) {
 			return 0;
 		}
-		double vel = (leftVel + rightVel) / 2;
 		double angularVel = (rightVel - leftVel) / (2 * ROBOT_RADIUS);
 
 		return angularVel / vel;
