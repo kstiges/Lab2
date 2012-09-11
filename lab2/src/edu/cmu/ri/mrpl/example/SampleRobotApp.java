@@ -414,7 +414,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				
 				pc.clear();
 				
-				RealPose2D robotRelWorld = new RealPose2D(robot.getPosX(),robot.getPosY(),robot.getHeading());
+				RealPose2D robotRelWorld = new RealPose2D(robot.getPosX(), robot.getPosY(), robot.getHeading());
 				pc.setReference(robotRelWorld);
 				if (perceptor.getCurvature() != 0 && robot.getVelLeft() != 0) {
 					for (int i = 0; i < sonars.length; i++){
