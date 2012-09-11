@@ -419,7 +419,11 @@ public class PointsConsoleTest extends JFrame implements ActionListener, TaskCon
 					Angle a = new Angle(22.5*i*Math.PI/180.0);
 					RealPose2D sonar = new RealPose2D(sonars[i],0.0,0.0);
 					RealPose2D sonarToRobot = new RealPose2D(0.19*Math.cos(a.angleValue()),0.19*Math.sin(a.angleValue()),a.angleValue());
-					pc.addPoint(RealPose2D.multiply(sonarToRobot, sonar));
+					RealPose2D obstacleToRobot = RealPose2D.multiply(sonarToRobot, sonar);
+					pc.addPoint(obstacleToRobot);
+					if (Math.random() < .1) {
+						System.out.println(obstacleToRobot);
+					}
 				}
 				pc.drawAll(robot, RobotModel.ROBOT_RADIUS);
 				// PMF: End using PointsConsole 

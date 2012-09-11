@@ -9,8 +9,11 @@ import static edu.cmu.ri.mrpl.RobotModel.*;
 
 public class Perceptor {
 	Robot robot;
-	private final double SONAR_RADIANS = 2 * Math.PI / NUM_SONARS;
-	private final double SONAR_WIDTH = Math.toRadians(25);
+	
+	public static final double SONAR_RADIANS = 2 * Math.PI / NUM_SONARS;
+	public static final double SONAR_WIDTH = Math.toRadians(25);
+	public static final double PADDING = 1*ROBOT_RADIUS;
+
 
 	public Perceptor(Robot robot) {
 		this.robot = robot;
@@ -41,8 +44,6 @@ public class Perceptor {
 		double[] sonars = new double[NUM_SONARS];
 		robot.getSonars(sonars);
 		
-		final double PADDING = 1*ROBOT_RADIUS;
-
 		for (int i = 0; i < NUM_SONARS; i++) {
 			double sonarDistance = sonars[i];
 			double robotDistance = sonarDistance + ROBOT_RADIUS;

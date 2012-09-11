@@ -31,6 +31,7 @@ import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
 import edu.cmu.ri.mrpl.util.Pair;
 import static edu.cmu.ri.mrpl.RobotModel.*;
 import edu.cmu.ri.mrpl.util.*;
+import static java.lang.Math.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
 
@@ -129,7 +130,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 		this.setLocationByPlatform(true);
 		this.pack();
-		this.setVisible(true);
+		// moved this line to the bottom to make the controls show up on top
+		//this.setVisible(true);
 
 		// construct the SonarConsole, but don't make it visible
 		scFrame = new JFrame("Sonar Console");
@@ -138,7 +140,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		scFrame.add(sc);
 		scFrame.pack();
 		
-		pc = new PointsConsole(768-640, 1024-640, 640, 640);
+		int pcDim = 480;
+		pc = new PointsConsole(768-pcDim, 1024-pcDim, pcDim, pcDim);
 		pc.setWorldViewport(-1.0 * DEFAULT_ROOM_SIZE, -1.0 * DEFAULT_ROOM_SIZE, 1.0 * DEFAULT_ROOM_SIZE - 0.5, 1.0 * DEFAULT_ROOM_SIZE - 0.5);
 
 		// construct tasks
@@ -160,13 +163,17 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		
 		f.setSize(pc.getPanel().getSize());
 		f.setVisible(true);
-		f.setLocation(200, 200);
+		//f.setLocation(200, 200);
+		this.setVisible(true);
 
-		//*
-		robot = new SimRobot();
-		/*/
-		robot = new ScoutRobot();
-		//*/
+		String message = "Is this running on the robot?";
+		int isRobot = JOptionPane.showConfirmDialog(null, message, message, JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+		if (isRobot == JOptionPane.YES_OPTION) {
+			robot = new ScoutRobot();
+		}
+		else {
+			robot = new SimRobot();
+		}
 	}
 
 	// call from GUI thread
@@ -309,7 +316,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				robot.updateState();
 				Area[] cSpaceObstacles = perceptor.getCSpaceObstacles();
 				
-				/* XXX draws obstacles and paths
+				//* XXX draws obstacles and paths
 				pc.clear();
 				double scaleFactor = 50;
 				int width = pc.getPanel().getWidth();
@@ -338,22 +345,32 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				
 				double maxMinCollisionDistance = -1;
 				for (Pair<Double, Area> curvPath : curvesAreas) {
-					maxMinCollisionDistance = Math.max(maxMinCollisionDistance,
-							cmp.getMinCollisionDistance(curvPath.getSecond()));
+					maxMinCollisionDistance = max(maxMinCollisionDistance,
+							cmp.getMinCollisionDistance(curvPath.getFirst(),
+									curvPath.getSecond()));
 				}
 				
-				if (maxMinCollisionDistance > ROBOT_RADIUS) {
-					int curvIndex = 0;
-					final double vel = 0.25;
-					controller.setCurvVel(curvesAreas[curvIndex].getFirst(), vel);
-					//System.out.println("paths dont suck, collision distance is: " + minMinCollisionDistance);
-				}
-				else {
+				if (maxMinCollisionDistance < ROBOT_RADIUS) {
+					double[] wheelVels = new double[2];
+					robot.getVel(wheelVels);
+					double direction = signum(wheelVels[1] - wheelVels[0]);
+					if (direction == 0)	{
+						direction = Math.random() > .5 ? 1 : -1;
+					}
 					final double spinSpeed = 0.1;
 					// turn around because all the paths suck
-					controller.setVel(spinSpeed, -spinSpeed);
-					System.out.println("turning around because all the paths suck."
-							+ " Collision Distance is: " + maxMinCollisionDistance);
+					controller.setVel(-direction*spinSpeed, direction*spinSpeed);
+					//System.out.println("turning around because all the paths suck."
+					//		+ " Collision Distance is: " + maxMinCollisionDistance);
+				}
+				else {
+					int curvIndex = 0;
+					double collisionDistance = cmp.getMinCollisionDistance(
+							currentCurvature,
+							Planner.curvatureToArea(currentCurvature));
+					double vel = Controller.MAX_SPEED * collisionDistance / 1;
+					controller.setCurvVel(curvesAreas[curvIndex].getFirst(), vel);
+					//System.out.println("paths dont suck, collision distance is: " + minMinCollisionDistance);
 				}
 				try {
 					Thread.sleep(50);
@@ -372,6 +389,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	}
 
 	class StatefulVisualizationTask extends Task {
+		
+		Perceptor perceptor;
 
 		StatefulVisualizationTask(TaskController tc) {
 			super(tc);
@@ -380,9 +399,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		public void taskRun() {
 			//showSC();
 			robot.turnSonarsOn();
+
+			perceptor = new Perceptor(robot);
 			
-			CircularArrayList<Point2D> worldPoints
-				= new CircularArrayList<Point2D>(NUM_SONARS*10);
+			final int historySize = 50;
+			final int bufferCapacity = NUM_SONARS*historySize;
+			RingBuffer<Point2D> worldPoints
+				= new RingBuffer<Point2D>(bufferCapacity);
 			
 			double[] sonars = new double[NUM_SONARS];
 			while(!shouldStop()) {
@@ -392,22 +415,27 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				pc.clear();
 				
 				RealPose2D robotRelWorld = new RealPose2D(robot.getPosX(),robot.getPosY(),robot.getHeading());
-				for( int i = 0; i < sonars.length; ++i){
-					RealPoint2D obstacleRelSonar = new RealPoint2D(sonars[i],0.0);
-					RealPose2D sonarRelRobot = sonarPose(i);
-					Point2D obstacleRelRobot = sonarRelRobot.transform(obstacleRelSonar, null);
-					Point2D obstacleRelWorld = robotRelWorld.transform(obstacleRelRobot, null);
-					// XXX does this overwrite the same sensor
-					// since the capacity is a multiple of NUM_SONARS?
-					worldPoints.add(obstacleRelWorld);
+				pc.setReference(robotRelWorld);
+				if (perceptor.getCurvature() != 0 && robot.getVelLeft() != 0) {
+					for (int i = 0; i < sonars.length; i++){
+						RealPoint2D obstacleRelSonar = new RealPoint2D(sonars[i],0.0);
+						RealPose2D sonarRelRobot = sonarPose(i);
+						Point2D obstacleRelRobot = sonarRelRobot.transform(obstacleRelSonar, null);
+						Point2D obstacleRelWorld = robotRelWorld.transform(obstacleRelRobot, null);
+						worldPoints.add(obstacleRelWorld);
+					}
 				}
-				pc.drawRobot(robot, ROBOT_RADIUS);
-				for (Point2D point : worldPoints) {
+				for (int i = 0; i < bufferCapacity; i++) {
+					Point2D point = worldPoints.get(i);
 					if (point == null) {
 						continue;
 					}
-					pc.drawPoint(new RealPose2D(robotRelWorld.inverseTransform(point, null), 0));
+					Point2D pointRelRobot = robotRelWorld.inverseTransform(point, null);
+					pc.addPoint(new RealPose2D(pointRelRobot, 0));
 				}
+				pc.drawAll(robot, ROBOT_RADIUS);
+				
+				robot.setVel(.25, .5);
 				
 				try {
 					Thread.sleep(50);

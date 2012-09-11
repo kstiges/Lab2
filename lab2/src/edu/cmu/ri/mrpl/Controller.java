@@ -4,7 +4,7 @@ import static edu.cmu.ri.mrpl.RobotModel.*;
 
 public class Controller {
 	Robot robot;
-	private final double MAX_SPEED = 0.5;
+	public static final double MAX_SPEED = 0.5;
 	
 	public Controller (Robot robot) {
 		this.robot = robot;
@@ -25,7 +25,7 @@ public class Controller {
 		
 		setVel(leftVel, rightVel);
 	}
-	
+	/*
 	public void chooseCurvedPath (Perceptor perceptor, int obstacleDirection) {
 		double k = perceptor.getCurvature();
 		double k_scalingFactor = 5; // arbitrarily chosen
@@ -39,4 +39,5 @@ public class Controller {
 		// tighter turns instead of herky jerky stopping/turning.
 		setCurvVel(k, Math.max(MAX_VEL, 1/k));
 	}
+	*/
 }

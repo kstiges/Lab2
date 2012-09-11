@@ -19,8 +19,9 @@ public class Planner {
 	{
 		double[] result = new double[n];
 		
-		double min = -5;
-		double max = 5;
+		double range = 3;
+		double min = -range;
+		double max = range;
 		double diff = max - min;
 		
 		for(int i = 0; i < n; i++)
@@ -70,6 +71,7 @@ public class Planner {
 		else {
 			obstacle = new Area(new Rectangle2D.Double(0, -pathWidth, arclength*100, pathWidth*2));
 		}
+		obstacle.intersect(new Area(new Rectangle2D.Double(0, -_maxSonarRange, _maxSonarRange, 2*_maxSonarRange)));
 		return obstacle;
 	}
 	
@@ -80,6 +82,7 @@ public class Planner {
 		for(int i = 0; i < curvatures.length; i++)
 		{
 			result[i] = new Pair<Double, Area>(curvatures[i], curvatureToArea(curvatures[i]));
+			System.out.println(result[i].getSecond().getBounds2D());
 		}
 		return result;
 	}
@@ -95,7 +98,17 @@ public class Planner {
 			minCollisionDistances = new HashMap<Area, Double>();
 		}
 		
-		private double getCollisionDistance (Area path, Area obstacle) {
+		private double getCollisionDistance (double k, Area path, Area obstacle) {
+			// check to see if path circle is smaller than distance to obstacle
+			if (k != 0) {
+				double radius = abs(1/k);
+				Rectangle2D bound = obstacle.getBounds2D();
+				double x = min(abs(bound.getMaxX()), abs(bound.getMinX()));
+				double y = min(abs(bound.getMaxY()), abs(bound.getMinY()));
+				double dist = sqrt(x*x + y*y);
+				if (2*radius < dist)
+					return _maxSonarRange;
+			}
 			Area intersection = (Area) path.clone();
 			intersection.intersect(obstacle);
 			Rectangle2D bound = intersection.getBounds2D();
@@ -109,13 +122,13 @@ public class Planner {
 			return dist;
 		}
 		
-		public double getMinCollisionDistance (Area path) {
+		public double getMinCollisionDistance (double k, Area path) {
 			if (minCollisionDistances.containsKey(path)) {
 				return minCollisionDistances.get(path);
 			}
-			double dist = Double.MAX_VALUE;
+			double dist = _maxSonarRange;
 			for (int i = 0; i < cSpaceObstacles.length; i++) {
-				dist = min(dist, getCollisionDistance(path, cSpaceObstacles[i]));
+				dist = min(dist, getCollisionDistance(k, path, cSpaceObstacles[i]));
 			}
 			minCollisionDistances.put(path, dist);
 			return dist;
@@ -125,8 +138,8 @@ public class Planner {
 			Area a1 = p1.getSecond();
 			Area a2 = p2.getSecond();
 			
-			double p1coll = getMinCollisionDistance(a1);
-			double p2coll = getMinCollisionDistance(a2);
+			double p1coll = getMinCollisionDistance(p1.getFirst(), a1);
+			double p2coll = getMinCollisionDistance(p2.getFirst(), a2);
 			
 			double collisionDiff = abs(p2coll - p1coll);
 			final double TOLERANCE = 0.25;
