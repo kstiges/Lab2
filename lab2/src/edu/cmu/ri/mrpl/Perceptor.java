@@ -82,14 +82,20 @@ public class Perceptor {
 	}
 
 	public double getCurvature() {
-		double leftVel = robot.getVelLeft();
-		double rightVel = robot.getVelRight();
-		double vel = (leftVel + rightVel) / 2;
+		double vel = getSpeed();
 		if (vel == 0) {
 			return 0;
 		}
-		double angularVel = (rightVel - leftVel) / (2 * ROBOT_RADIUS);
+		double angularVel = (robot.getVelRight() - robot.getVelLeft())
+				/ (2 * ROBOT_RADIUS);
 
 		return angularVel / vel;
+	}
+	
+	public double getSpeed() {
+		double leftVel = robot.getVelLeft();
+		double rightVel = robot.getVelRight();
+		double vel = (leftVel + rightVel) / 2;
+		return vel;
 	}
 }

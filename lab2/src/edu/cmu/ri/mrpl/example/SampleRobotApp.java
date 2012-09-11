@@ -355,7 +355,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					robot.getVel(wheelVels);
 					double direction = signum(wheelVels[1] - wheelVels[0]);
 					if (direction == 0)	{
-						direction = Math.random() > .5 ? 1 : -1;
+						direction = random() > .5 ? 1 : -1;
 					}
 					final double spinSpeed = 0.1;
 					// turn around because all the paths suck
@@ -372,6 +372,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					controller.setCurvVel(curvesAreas[curvIndex].getFirst(), vel);
 					//System.out.println("paths dont suck, collision distance is: " + minMinCollisionDistance);
 				}
+				
+				
 				try {
 					Thread.sleep(50);
 				} catch(InterruptedException iex) {
@@ -452,19 +454,108 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			return "sonar loop";
 		}
 	}
+	
+	private enum WallFollowState {
+		GO, TURN, STOP
+	}
 
 	class StatefulWandererTask extends Task {
+		
+		Perceptor perceptor;
+		Controller controller;
 
 		StatefulWandererTask(TaskController tc) {
 			super(tc);
 		}
+		
+		private WallFollowState wallFollowState = WallFollowState.GO;
 
 		public void taskRun() {
-			showSC();
+			//showSC();
 			robot.turnSonarsOn();
+			double[] sonars = new double[NUM_SONARS];
+			
+			perceptor = new Perceptor(robot);
+			controller = new Controller(robot);
+			
+			final double ANGLE_TOLERANCE = 0.025;
+			final double WALL_DISTANCE = ROBOT_RADIUS;
+			
+			double targetAngle = 0;
+			double oldRightSonar = Double.MAX_VALUE;
 
-			while(!shouldStop()) {
+			while(!shouldStop()) {				
 				robot.updateState();
+				robot.getSonars(sonars);
+				
+				// adjust angle if needed
+				final double currentAngle = (robot.getHeading() + 2*PI) % (2*PI);
+				targetAngle += 2*PI;
+				targetAngle %= 2*PI;
+				double diffAngle = targetAngle - currentAngle;
+				if (abs(diffAngle) > PI) {
+					diffAngle -= signum(diffAngle) * 2*PI;
+				}
+								
+				switch (wallFollowState) {
+				case GO:
+					// check for followed wall to disappear
+					double rightSonar = sonars[12];
+					if (rightSonar > 3*oldRightSonar && oldRightSonar > 0) {
+						System.out.println("should turn right");
+						wallFollowState = WallFollowState.STOP;
+						System.out.println("state = " + wallFollowState);
+						targetAngle -= toRadians(90);
+						break;
+					}
+					// check for wall ahead
+					double frontSonar = sonars[0];
+					double error = frontSonar - WALL_DISTANCE;
+					if (abs(error) > 0.05) {
+						final double SPEED_FACTOR = 1;
+						double speed = error * SPEED_FACTOR;
+						// TODO adjust angle gradually
+						final double SLIGHT_SPIN_FACTOR = 0.25;
+						double angleAdjust = diffAngle*SLIGHT_SPIN_FACTOR;
+						controller.setVel(speed-angleAdjust, speed+angleAdjust);
+					}
+					else if (perceptor.getSpeed() == 0) {
+						wallFollowState = WallFollowState.TURN;
+						System.out.println("state = " + wallFollowState);
+						
+						// TODO don't only turn right
+						targetAngle += toRadians(90);
+					}
+					else {
+						controller.setVel(0, 0);
+					}
+					break;
+				case TURN:
+					if (abs(diffAngle) > ANGLE_TOLERANCE && abs(diffAngle - 2*PI) > ANGLE_TOLERANCE) {
+						final double SPIN_FACTOR = 0.25;
+						final double speed = diffAngle * SPIN_FACTOR;
+						controller.setVel(-speed, speed);
+					}
+					else if (perceptor.getSpeed() == 0) {
+						System.out.println("currentAngle = " + currentAngle);
+						System.out.println("targetAngle = " + targetAngle);
+						wallFollowState = WallFollowState.GO;
+						System.out.println("state = " + wallFollowState);
+					}
+					else {
+						controller.setVel(0, 0);
+					}
+					break;
+				case STOP:
+					if (perceptor.getSpeed() == 0) {
+						wallFollowState = WallFollowState.TURN;
+					}
+					else {
+						controller.setVel(0, 0);
+					}
+				}
+				
+				oldRightSonar = sonars[12];
 				
 				try {
 					Thread.sleep(50);
@@ -475,7 +566,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			robot.turnSonarsOff();
 			robot.setVel(0.0f, 0.0f);
-			hideSC();
+			//hideSC();
 		}
 
 		public String toString() {
