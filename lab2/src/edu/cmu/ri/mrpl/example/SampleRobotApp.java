@@ -42,6 +42,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	private JButton turnToButton;
 	private JButton goToButton;
 	private JFormattedTextField argumentField;
+	private JTextField remainingField;
 
 	private JButton stopButton;
 	private JButton quitButton;
@@ -68,6 +69,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		goToButton = new JButton("Go to distance!");
 		argumentField = new JFormattedTextField(NumberFormat.getInstance());
 		argumentField.setValue(0);
+		remainingField = new JTextField();
+		remainingField.setEditable(false);
 		stopButton = new JButton(">> stop <<");
 		quitButton = new JButton(">> quit <<");
 
@@ -121,6 +124,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		main.add(box);
 		box.add(Box.createHorizontalStrut(30));
 		box.add(argumentField);
+		box.add(Box.createHorizontalStrut(30));
+		box.add(remainingField);
 		box.add(Box.createHorizontalStrut(30));
 
 		main.add(Box.createVerticalStrut(30));
@@ -375,6 +380,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			startTime = System.currentTimeMillis();
 			
 			while(!done()) {
+				// TODO update second text box here?
 				try {
 					Thread.sleep(50);
 				} catch(InterruptedException iex) {
