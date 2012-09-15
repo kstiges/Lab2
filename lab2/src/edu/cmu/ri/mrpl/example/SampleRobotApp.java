@@ -11,24 +11,18 @@ package edu.cmu.ri.mrpl.example;
  */
 
 import java.io.*;
-import java.util.Arrays;
+import java.text.NumberFormat;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.Area;
 import java.awt.geom.Point2D;
-import java.awt.geom.Rectangle2D;
 
 import javax.swing.*;
 
 import edu.cmu.ri.mrpl.*;
-import edu.cmu.ri.mrpl.Planner.CurvPathComparator;
 import edu.cmu.ri.mrpl.Robot;
 import edu.cmu.ri.mrpl.gui.PointsConsole;
-import edu.cmu.ri.mrpl.kinematics2D.Angle;
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
-import edu.cmu.ri.mrpl.util.Pair;
 import static edu.cmu.ri.mrpl.RobotModel.*;
 import edu.cmu.ri.mrpl.util.*;
 import static java.lang.Math.*;
@@ -37,21 +31,25 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 	private Robot robot;
 	private SonarConsole sc;
+	
 	private JFrame scFrame;
 
 	private JButton connectButton;
 	private JButton disconnectButton;
 
-	private JButton reactiveWandererButton;
-	private JButton statefulVisualizationButton;
-	private JButton statefulWanderer;
+	private JButton pauseButton;
+	private JButton waitButton;
+	private JButton turnToButton;
+	private JButton goToButton;
+	private JFormattedTextField argumentField;
 
 	private JButton stopButton;
 	private JButton quitButton;
 
-	private ReactiveWandererTask reactiveWandererTask;
-	private StatefulVisualizationTask statefulVisualizationTask;
-	private StatefulWandererTask statefulWandererTask;
+	private PauseTask pauseTask;
+	private WaitTask waitTask;
+	private TurnToTask turnToTask;
+	private GoToTask goToTask;
 	
 	private PointsConsole pc;
 	static final int DEFAULT_ROOM_SIZE = 4;
@@ -64,18 +62,22 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		connectButton = new JButton("connect");
 		disconnectButton = new JButton("disconnect");
 
-		reactiveWandererButton = new JButton("Run Reactive Wanderer!");
-		statefulVisualizationButton = new JButton("Run Stateful Visualization!");
-		statefulWanderer = new JButton("Run Stateful Wanderer!");
+		pauseButton = new JButton("Pause!");
+		waitButton = new JButton("Wait!");
+		turnToButton = new JButton("Turn to angle!");
+		goToButton = new JButton("Go to distance!");
+		argumentField = new JFormattedTextField(NumberFormat.getInstance());
+		argumentField.setValue(0);
 		stopButton = new JButton(">> stop <<");
 		quitButton = new JButton(">> quit <<");
 
 		connectButton.addActionListener(this);
 		disconnectButton.addActionListener(this);
 
-		reactiveWandererButton.addActionListener(this);
-		statefulVisualizationButton.addActionListener(this);
-		statefulWanderer.addActionListener(this);
+		pauseButton.addActionListener(this);
+		waitButton.addActionListener(this);
+		turnToButton.addActionListener(this);
+		goToButton.addActionListener(this);
 		stopButton.addActionListener(this);
 		quitButton.addActionListener(this);
 
@@ -98,16 +100,28 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		box = Box.createHorizontalBox();
 		main.add(box);
 		box.add(Box.createHorizontalStrut(30));
-		box.add(reactiveWandererButton);
+		box.add(pauseButton);
 		box.add(Box.createHorizontalStrut(30));
-		box.add(statefulVisualizationButton);
+		box.add(waitButton);
 		box.add(Box.createHorizontalStrut(30));
 
 		main.add(Box.createVerticalStrut(30));
 
 		box = Box.createHorizontalBox();
 		main.add(box);
-		box.add(statefulWanderer);
+		box.add(Box.createHorizontalStrut(30));
+		box.add(turnToButton);
+		box.add(Box.createHorizontalStrut(30));
+		box.add(goToButton);
+		box.add(Box.createHorizontalStrut(30));
+
+		main.add(Box.createVerticalStrut(30));
+		
+		box = Box.createHorizontalBox();
+		main.add(box);
+		box.add(Box.createHorizontalStrut(30));
+		box.add(argumentField);
+		box.add(Box.createHorizontalStrut(30));
 
 		main.add(Box.createVerticalStrut(30));
 
@@ -145,21 +159,15 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		pc.setWorldViewport(-1.0 * DEFAULT_ROOM_SIZE, -1.0 * DEFAULT_ROOM_SIZE, 1.0 * DEFAULT_ROOM_SIZE - 0.5, 1.0 * DEFAULT_ROOM_SIZE - 0.5);
 
 		// construct tasks
-		reactiveWandererTask = new ReactiveWandererTask(this);
-		statefulVisualizationTask = new StatefulVisualizationTask(this);
-		statefulWandererTask = new StatefulWandererTask(this);
+		pauseTask = new PauseTask(this);
+		waitTask = new WaitTask(this);
+		turnToTask = new TurnToTask(this);
+		goToTask = new GoToTask(this);
 		
 		Frame f = new Frame();
 		f.setTitle("Points Console");
 		
-		/* TODO figure this out
-		RotatePanel rp = new RotatePanel();
-		rp.add(pc.getPanel());
-		rp.setSize(pc.getPanel().getSize());
-		f.add(rp);
-		/*/
 		f.add(pc.getPanel());
-		//*/
 		
 		f.setSize(pc.getPanel().getSize());
 		f.setVisible(true);
@@ -255,15 +263,20 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			stop();
 		} else if ( source==quitButton ) {
 			quit();
-		} else if ( source==reactiveWandererButton ) {
-			(new Thread(reactiveWandererTask)).start();
-		} else if ( source==statefulVisualizationButton ) {
-			(new Thread(statefulVisualizationTask)).start();
-		} else if ( source==statefulWanderer ) {
-			(new Thread(statefulWandererTask)).start();
+		} else if ( source==pauseButton ) {
+			(new Thread(pauseTask)).start();
+		} else if ( source==waitButton ) {
+			// read argument from text field
+			waitTask.setDuration(Double.parseDouble(argumentField.getText()));
+			(new Thread(waitTask)).start();
+		} else if ( source==turnToButton ) {
+			(new Thread(turnToTask)).start();
+		} else if ( source==goToButton ) {
+			(new Thread(goToTask)).start();
 		}
 	}
 
+	// TODO allow more than one task to run?
 	public synchronized boolean canStart(Task t) {
 		if (curTask!=null)
 			return false;
@@ -293,108 +306,105 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	// as Tasks
 	//
 	
-	class ReactiveWandererTask extends Task {
+	class PauseTask extends Task implements KeyListener, MouseListener {
 		
-		Perceptor perceptor;
-		Controller controller;
+		Speech speech;
+		boolean done;
 
-		ReactiveWandererTask(TaskController tc) {
+		PauseTask(TaskController tc) {
 			super(tc);
 		}
 
 		public void taskRun() {
-			robot.turnSonarsOn();
-			
-			perceptor = new Perceptor(robot);
-			controller = new Controller(robot);
-			
-			final double[] curves = Planner.curvatureRange(11);
-			final Pair<Double, Area>[] curvesAreas = Planner.curvaturesToAreas(curves);
+			// XXX this doesn't work right now
+			//speech.speak("Waiting for you");
+			done = false;
 
-			while(!shouldStop()) {
-				
-				robot.updateState();
-				Area[] cSpaceObstacles = perceptor.getCSpaceObstacles();
-				
-				//* XXX draws obstacles and paths
-				pc.clear();
-				double scaleFactor = 50;
-				int width = pc.getPanel().getWidth();
-				int height = pc.getPanel().getHeight();
-				for (int i = 0; i < NUM_SONARS; i++) {
-					Area a = (Area) cSpaceObstacles[i].clone();
+			SampleRobotApp.this.addKeyListener(this);
+			SampleRobotApp.this.addMouseListener(this);
 
-					a.transform(AffineTransform.getScaleInstance(scaleFactor, -scaleFactor));
-					a.transform(AffineTransform.getTranslateInstance(width/2, height/2));
-					((Graphics2D) pc.getPanel().getGraphics()).draw(a);
-				}
-				
-				for (int i = 0; i < curves.length; i++)
-				{
-					Area c = (Area) curvesAreas[i].getSecond().clone();
-					
-					c.transform(AffineTransform.getScaleInstance(scaleFactor, -scaleFactor));
-					c.transform(AffineTransform.getTranslateInstance(width/2, height/2));
-					((Graphics2D) pc.getPanel().getGraphics()).draw(c);
-				}
-				//*/
-				
-				double currentCurvature = perceptor.getCurvature();
-				CurvPathComparator cmp = new Planner.CurvPathComparator(currentCurvature, cSpaceObstacles);
-				Arrays.sort(curvesAreas, cmp);
-				
-				double maxMinCollisionDistance = -1;
-				for (Pair<Double, Area> curvPath : curvesAreas) {
-					maxMinCollisionDistance = max(maxMinCollisionDistance,
-							cmp.getMinCollisionDistance(curvPath.getFirst(),
-									curvPath.getSecond()));
-				}
-				
-				if (maxMinCollisionDistance < ROBOT_RADIUS) {
-					double[] wheelVels = new double[2];
-					robot.getVel(wheelVels);
-					double direction = signum(wheelVels[1] - wheelVels[0]);
-					if (direction == 0)	{
-						direction = random() > .5 ? 1 : -1;
-					}
-					final double spinSpeed = 0.1;
-					// turn around because all the paths suck
-					controller.setVel(-direction*spinSpeed, direction*spinSpeed);
-					//System.out.println("turning around because all the paths suck."
-					//		+ " Collision Distance is: " + maxMinCollisionDistance);
-				}
-				else {
-					int curvIndex = 0;
-					double collisionDistance = cmp.getMinCollisionDistance(
-							currentCurvature,
-							Planner.curvatureToArea(currentCurvature));
-					double vel = Controller.MAX_SPEED * collisionDistance / 1;
-					controller.setCurvVel(curvesAreas[curvIndex].getFirst(), vel);
-					//System.out.println("paths dont suck, collision distance is: " + minMinCollisionDistance);
-				}
-				
-				
+			while(!done) {
 				try {
 					Thread.sleep(50);
 				} catch(InterruptedException iex) {
-					System.out.println("reactive wanderer sleep interrupted");
+					System.out.println("pause sleep interrupted");
 				}
 			}
-			
-			robot.turnSonarsOff();
-			robot.setVel(0,0);
 		}
 
 		public String toString() {
-			return "sample program";
+			return "pause task";
+		}
+
+		public void keyPressed(KeyEvent e) {
+			done = true;
+			SampleRobotApp.this.removeKeyListener(this);
+		}
+		
+		public void mouseClicked(MouseEvent arg0) {
+			done = true;
+			SampleRobotApp.this.removeMouseListener(this);
+		}
+
+		public void keyReleased(KeyEvent e) {}
+		public void keyTyped(KeyEvent e) {}
+		public void mouseEntered(MouseEvent arg0) {}
+		public void mouseExited(MouseEvent arg0) {}
+		public void mousePressed(MouseEvent arg0) {}
+		public void mouseReleased(MouseEvent arg0) {}
+	}
+	
+	class WaitTask extends Task {
+
+		Speech speech;
+		double duration;
+		private long startTime;
+
+		WaitTask(TaskController tc) {
+			super(tc);
+		}
+		
+		public void setDuration (double d) {
+			duration = d;
+		}
+
+		public void taskRun() {
+			//XXX this doesn't work now
+			//speech = new Speech();
+			//sayDuration();
+			startTime = System.currentTimeMillis();
+			
+			while(!done()) {
+				try {
+					Thread.sleep(50);
+				} catch(InterruptedException iex) {
+					System.out.println("wait sleep interrupted");
+				}
+			}
+		}
+		
+		private void sayDuration () {
+			// cut off past two significant figures
+			double roundedDuration = ((int) (duration*100)) / 100.0;
+			if (speech != null) {
+				speech.speak("Waiting " + roundedDuration + " seconds");
+			}
+		}
+
+ 		private boolean done() {
+			return (System.currentTimeMillis() - startTime) / 1000 > duration;
+		}
+
+		public String toString() {
+			return "wait task";
 		}
 	}
 
-	class StatefulVisualizationTask extends Task {
+	class TurnToTask extends Task {
 		
 		Perceptor perceptor;
 
-		StatefulVisualizationTask(TaskController tc) {
+		TurnToTask(TaskController tc) {
 			super(tc);
 		}
 
@@ -459,12 +469,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		GO, TURN, STOP
 	}
 
-	class StatefulWandererTask extends Task {
+	class GoToTask extends Task {
 		
 		Perceptor perceptor;
 		Controller controller;
 
-		StatefulWandererTask(TaskController tc) {
+		GoToTask(TaskController tc) {
 			super(tc);
 		}
 		
@@ -514,7 +524,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					if (abs(error) > 0.05) {
 						final double SPEED_FACTOR = 1;
 						double speed = error * SPEED_FACTOR;
-						// TODO adjust angle gradually
 						final double SLIGHT_SPIN_FACTOR = 0.25;
 						double angleAdjust = diffAngle*SLIGHT_SPIN_FACTOR;
 						controller.setVel(speed-angleAdjust, speed+angleAdjust);
@@ -523,7 +532,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						wallFollowState = WallFollowState.TURN;
 						System.out.println("state = " + wallFollowState);
 						
-						// TODO don't only turn right
 						targetAngle += toRadians(90);
 					}
 					else {
