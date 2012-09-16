@@ -20,11 +20,7 @@ import javax.swing.*;
 
 import edu.cmu.ri.mrpl.*;
 import edu.cmu.ri.mrpl.Robot;
-import edu.cmu.ri.mrpl.gui.PointsConsole;
-import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
-import static edu.cmu.ri.mrpl.RobotModel.*;
-import edu.cmu.ri.mrpl.util.*;
 import static java.lang.Math.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
@@ -42,7 +38,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	private JButton turnToButton;
 	private JButton goToButton;
 	private JFormattedTextField argumentField;
-	private JTextField remainingField;
+	private JFormattedTextField remainingField;
 
 	private JButton stopButton;
 	private JButton quitButton;
@@ -52,7 +48,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	private TurnToTask turnToTask;
 	private GoToTask goToTask;
 	
-	private PointsConsole pc;
 	static final int DEFAULT_ROOM_SIZE = 4;
 	
 	private Task curTask = null;
@@ -69,7 +64,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		goToButton = new JButton("Go to distance!");
 		argumentField = new JFormattedTextField(NumberFormat.getInstance());
 		argumentField.setValue(0);
-		remainingField = new JTextField();
+		NumberFormat nf = NumberFormat.getInstance();
+		nf.setMaximumFractionDigits(2);
+		remainingField = new JFormattedTextField(nf);
 		remainingField.setEditable(false);
 		stopButton = new JButton(">> stop <<");
 		quitButton = new JButton(">> quit <<");
@@ -159,24 +156,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		scFrame.add(sc);
 		scFrame.pack();
 		
-		int pcDim = 480;
-		pc = new PointsConsole(768-pcDim, 1024-pcDim, pcDim, pcDim);
-		pc.setWorldViewport(-1.0 * DEFAULT_ROOM_SIZE, -1.0 * DEFAULT_ROOM_SIZE, 1.0 * DEFAULT_ROOM_SIZE - 0.5, 1.0 * DEFAULT_ROOM_SIZE - 0.5);
-
 		// construct tasks
 		pauseTask = new PauseTask(this);
 		waitTask = new WaitTask(this);
 		turnToTask = new TurnToTask(this);
 		goToTask = new GoToTask(this);
 		
-		Frame f = new Frame();
-		f.setTitle("Points Console");
-		
-		f.add(pc.getPanel());
-		
-		f.setSize(pc.getPanel().getSize());
-		f.setVisible(true);
-		//f.setLocation(200, 200);
 		this.setVisible(true);
 
 		String message = "Is this running on the robot?";
@@ -260,6 +245,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 	public void actionPerformed(ActionEvent e) {
 		Object source = e.getSource();
+		
+		double argument = Double.parseDouble(argumentField.getText());
+		
 		if (source==connectButton) {
 			connect();
 		} else if ( source==disconnectButton ) {
@@ -272,9 +260,10 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			(new Thread(pauseTask)).start();
 		} else if ( source==waitButton ) {
 			// read argument from text field
-			waitTask.setDuration(Double.parseDouble(argumentField.getText()));
+			waitTask.setDuration(argument);
 			(new Thread(waitTask)).start();
 		} else if ( source==turnToButton ) {
+			turnToTask.setDesiredAngle(argument);
 			(new Thread(turnToTask)).start();
 		} else if ( source==goToButton ) {
 			(new Thread(goToTask)).start();
@@ -324,17 +313,23 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			// XXX this doesn't work right now
 			//speech.speak("Waiting for you");
 			done = false;
+			long startTime = System.currentTimeMillis();
 
-			SampleRobotApp.this.addKeyListener(this);
+			// XXX these only catch events on the specific object
+			pauseButton.addKeyListener(this);
 			SampleRobotApp.this.addMouseListener(this);
 
-			while(!done) {
+			while(!shouldStop() && !done) {
 				try {
 					Thread.sleep(50);
 				} catch(InterruptedException iex) {
 					System.out.println("pause sleep interrupted");
 				}
 			}
+			
+			long endTime = System.currentTimeMillis();
+			double elapsedTime = (endTime - startTime) / 1000.0;
+			remainingField.setValue(elapsedTime);
 		}
 
 		public String toString() {
@@ -376,17 +371,27 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		public void taskRun() {
 			//XXX this doesn't work now
 			//speech = new Speech();
-			//sayDuration();
+			sayDuration();
 			startTime = System.currentTimeMillis();
+			double elapsed = elapsedTime();
 			
-			while(!done()) {
-				// TODO update second text box here?
+			while(!shouldStop() && elapsed < duration) {
+				elapsed = elapsedTime();
+				if (elapsed >= duration) {
+					break;
+				}
 				try {
-					Thread.sleep(50);
+					// XXX is this the right place to update this box?
+					remainingField.setValue(duration - elapsed);
+					
+					
+					Thread.sleep(5);
 				} catch(InterruptedException iex) {
 					System.out.println("wait sleep interrupted");
 				}
 			}
+			// final update
+			remainingField.setText(duration - elapsed + "");
 		}
 		
 		private void sayDuration () {
@@ -397,8 +402,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 		}
 
- 		private boolean done() {
-			return (System.currentTimeMillis() - startTime) / 1000 > duration;
+ 		private double elapsedTime() {
+			return (System.currentTimeMillis() - startTime) / 1000.0;
 		}
 
 		public String toString() {
@@ -408,66 +413,75 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 	class TurnToTask extends Task {
 		
-		Perceptor perceptor;
+		double desiredAngle;
+		Controller controller;
 
 		TurnToTask(TaskController tc) {
 			super(tc);
 		}
+		
+		public void setDesiredAngle (double a) {
+			desiredAngle = a;
+		}
 
 		public void taskRun() {
-			//showSC();
-			robot.turnSonarsOn();
+			controller = new Controller(robot);
+			final double Kp = 0.4;
+			final double Kd = 50000000;
+			double u = 0;
+			robot.updateState();
+			double curAngle = robot.getHeading();
+			double lastAngle = curAngle;
+			double curTime = System.nanoTime();
+			double lastTime = curTime;
+			double destAngle = curAngle + desiredAngle;
+			double angleErr = AngleMath.add(destAngle, -curAngle);
+			
+			final double ANGLE_TOLERANCE = 0.05;
 
-			perceptor = new Perceptor(robot);
-			
-			final int historySize = 50;
-			final int bufferCapacity = NUM_SONARS*historySize;
-			RingBuffer<Point2D> worldPoints
-				= new RingBuffer<Point2D>(bufferCapacity);
-			
-			double[] sonars = new double[NUM_SONARS];
-			while(!shouldStop()) {
+			while(!shouldStop() &&
+					(abs(angleErr) > ANGLE_TOLERANCE 
+							|| robot.getVelLeft() != 0) )
+			{
 				robot.updateState();
-				robot.getSonars(sonars);
+				lastAngle = curAngle;
+				lastTime = curTime;
+				curAngle = robot.getHeading();
+				curTime = System.nanoTime();
+				angleErr = AngleMath.add(destAngle, -curAngle);
 				
-				pc.clear();
-				
-				RealPose2D robotRelWorld = new RealPose2D(robot.getPosX(), robot.getPosY(), robot.getHeading());
-				pc.setReference(robotRelWorld);
-				if (perceptor.getCurvature() != 0 && robot.getVelLeft() != 0) {
-					for (int i = 0; i < sonars.length; i++){
-						RealPoint2D obstacleRelSonar = new RealPoint2D(sonars[i],0.0);
-						RealPose2D sonarRelRobot = sonarPose(i);
-						Point2D obstacleRelRobot = sonarRelRobot.transform(obstacleRelSonar, null);
-						Point2D obstacleRelWorld = robotRelWorld.transform(obstacleRelRobot, null);
-						worldPoints.add(obstacleRelWorld);
-					}
+				double angleTraveled = AngleMath.add(curAngle, -lastAngle);
+				boolean progressMade = signum(angleTraveled) == signum(angleErr);
+
+				double pterm = Kp*angleErr;
+				double dterm = Kd*(abs(angleTraveled))/(curTime-lastTime);
+				if (progressMade) {
+					dterm *= -1;
 				}
-				for (int i = 0; i < bufferCapacity; i++) {
-					Point2D point = worldPoints.get(i);
-					if (point == null) {
-						continue;
-					}
-					Point2D pointRelRobot = robotRelWorld.inverseTransform(point, null);
-					pc.addPoint(new RealPose2D(pointRelRobot, 0));
-				}
-				pc.drawAll(robot, ROBOT_RADIUS);
-				
-				robot.setVel(.25, .5);
+				System.err.println(dterm);
+				/*
+				u = pterm;
+				/*/
+				u = pterm + dterm;
+				//*/
+				double direction = signum(angleErr);
+				//System.err.println(angleErr + " off, speed = " + u*direction);
+				double speed = u;
+				controller.setVel(-speed, speed);
 				
 				try {
-					Thread.sleep(50);
+					Thread.sleep(5);
 				} catch(InterruptedException iex) {
-					System.out.println("visualization sleep interrupted");
+					System.out.println("turn-to sleep interrupted");
 				}
 			}
-
-			robot.turnSonarsOff();
-			//hideSC();
+			
+			// TODO speak error aloud
+			controller.stop();
 		}
 
 		public String toString() {
-			return "sonar loop";
+			return "turn-to";
 		}
 	}
 	
@@ -477,114 +491,80 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 	class GoToTask extends Task {
 		
-		Perceptor perceptor;
+		double desiredDistance;
+		RealPose2D robotStartedHere;
 		Controller controller;
+		Perceptor perceptor;
 
 		GoToTask(TaskController tc) {
 			super(tc);
 		}
 		
-		private WallFollowState wallFollowState = WallFollowState.GO;
+		public void setDesiredDistance (double d) {
+			desiredDistance = d;
+			robotStartedHere = perceptor.getPose();
+		}
 
 		public void taskRun() {
-			//showSC();
-			robot.turnSonarsOn();
-			double[] sonars = new double[NUM_SONARS];
-			
-			perceptor = new Perceptor(robot);
 			controller = new Controller(robot);
+			perceptor = new Perceptor(robot);
+			final double Kp = 0.4;
+			final double Kd = 50000000;
+			double u = 0;
+			RealPose2D curPose = perceptor.getPose();
+			RealPose2D lastPose = curPose;
+			double curTime = System.nanoTime();
+			double lastTime = curTime;
+			Point2D destPoint = curPose.transform(new Point2D.Double(desiredDistance, 0), null);
+			double distanceErr = curPose.getPosition().distance(destPoint);
 			
-			final double ANGLE_TOLERANCE = 0.025;
-			final double WALL_DISTANCE = ROBOT_RADIUS;
-			
-			double targetAngle = 0;
-			double oldRightSonar = Double.MAX_VALUE;
+			final double DISTANCE_TOLERANCE = 0.05;
 
-			while(!shouldStop()) {				
+			while(!shouldStop() &&
+					(abs(distanceErr) > DISTANCE_TOLERANCE 
+							|| robot.getVelLeft() != 0) )
+			{
 				robot.updateState();
-				robot.getSonars(sonars);
-				
-				// adjust angle if needed
-				final double currentAngle = (robot.getHeading() + 2*PI) % (2*PI);
-				targetAngle += 2*PI;
-				targetAngle %= 2*PI;
-				double diffAngle = targetAngle - currentAngle;
-				if (abs(diffAngle) > PI) {
-					diffAngle -= signum(diffAngle) * 2*PI;
-				}
-								
-				switch (wallFollowState) {
-				case GO:
-					// check for followed wall to disappear
-					double rightSonar = sonars[12];
-					if (rightSonar > 3*oldRightSonar && oldRightSonar > 0) {
-						System.out.println("should turn right");
-						wallFollowState = WallFollowState.STOP;
-						System.out.println("state = " + wallFollowState);
-						targetAngle -= toRadians(90);
-						break;
-					}
-					// check for wall ahead
-					double frontSonar = sonars[0];
-					double error = frontSonar - WALL_DISTANCE;
-					if (abs(error) > 0.05) {
-						final double SPEED_FACTOR = 1;
-						double speed = error * SPEED_FACTOR;
-						final double SLIGHT_SPIN_FACTOR = 0.25;
-						double angleAdjust = diffAngle*SLIGHT_SPIN_FACTOR;
-						controller.setVel(speed-angleAdjust, speed+angleAdjust);
-					}
-					else if (perceptor.getSpeed() == 0) {
-						wallFollowState = WallFollowState.TURN;
-						System.out.println("state = " + wallFollowState);
+				lastPose = curPose;
+				lastTime = curTime;
+				curPose = perceptor.getPose();
+				curTime = System.nanoTime();
+				distanceErr = curPose.inverseTransform(destPoint, null).getX();
 						
-						targetAngle += toRadians(90);
-					}
-					else {
-						controller.setVel(0, 0);
-					}
-					break;
-				case TURN:
-					if (abs(diffAngle) > ANGLE_TOLERANCE && abs(diffAngle - 2*PI) > ANGLE_TOLERANCE) {
-						final double SPIN_FACTOR = 0.25;
-						final double speed = diffAngle * SPIN_FACTOR;
-						controller.setVel(-speed, speed);
-					}
-					else if (perceptor.getSpeed() == 0) {
-						System.out.println("currentAngle = " + currentAngle);
-						System.out.println("targetAngle = " + targetAngle);
-						wallFollowState = WallFollowState.GO;
-						System.out.println("state = " + wallFollowState);
-					}
-					else {
-						controller.setVel(0, 0);
-					}
-					break;
-				case STOP:
-					if (perceptor.getSpeed() == 0) {
-						wallFollowState = WallFollowState.TURN;
-					}
-					else {
-						controller.setVel(0, 0);
-					}
+				// XXX this is always positive right now
+				// this means that the dterm won't work right
+				double distanceTraveled = curPose.getPosition().distance(lastPose.getPosition());
+				boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
+
+				double pterm = Kp*distanceErr;
+				double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
+				if (progressMade) {
+					dterm *= -1;
 				}
-				
-				oldRightSonar = sonars[12];
+				System.err.println(dterm);
+				//*
+				u = pterm;
+				/*/
+				u = pterm + dterm;
+				//*/
+				double direction = signum(distanceErr);
+				//System.err.println(angleErr + " off, speed = " + u*direction);
+				double speed = u;
+				controller.setVel(speed, speed);
 				
 				try {
-					Thread.sleep(50);
+					Thread.sleep(5);
 				} catch(InterruptedException iex) {
-					System.out.println("\"stateful wanderer\" sleep interrupted");
+					System.out.println("go-to sleep interrupted");
 				}
 			}
-
-			robot.turnSonarsOff();
-			robot.setVel(0.0f, 0.0f);
-			//hideSC();
+			
+			// TODO speak error aloud
+			controller.stop();
 		}
 
 		public String toString() {
-			return "\"both\"";
+			return "go-to";
 		}
 	}
 	

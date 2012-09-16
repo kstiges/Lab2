@@ -12,11 +12,20 @@ public class Controller {
 	}
 	
 	public void setVel (double leftVel, double rightVel) {
-		// clamp values
-		leftVel = min(leftVel, MAX_SPEED);
-		rightVel = min(rightVel, MAX_SPEED);
-		leftVel = max(leftVel, -MAX_SPEED);
-		rightVel = max(rightVel, -MAX_SPEED);
+		// clamp values proportionally
+		
+		double maxVel = max(abs(leftVel), abs(rightVel));
+		if (maxVel > MAX_SPEED) {
+			double scaleFactor = MAX_SPEED / maxVel;
+			leftVel *= scaleFactor;
+			rightVel *= scaleFactor;
+			/*
+			leftVel = min(leftVel, MAX_SPEED);
+			rightVel = min(rightVel, MAX_SPEED);
+			leftVel = max(leftVel, -MAX_SPEED);
+			rightVel = max(rightVel, -MAX_SPEED);
+			*/
+		}
 		robot.setVel(leftVel, rightVel);
 	}
 	
@@ -27,5 +36,9 @@ public class Controller {
 		double leftVel = speed - angularVelocity*ROBOT_RADIUS;
 		
 		setVel(leftVel, rightVel);
+	}
+
+	public void stop() {
+		setVel(0,0);		
 	}
 }

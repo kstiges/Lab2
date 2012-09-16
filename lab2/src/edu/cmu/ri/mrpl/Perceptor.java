@@ -5,6 +5,7 @@ import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
+import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
 import static edu.cmu.ri.mrpl.RobotModel.*;
 
 public class Perceptor {
@@ -14,9 +15,12 @@ public class Perceptor {
 	public static final double SONAR_WIDTH = Math.toRadians(25);
 	public static final double PADDING = 1*ROBOT_RADIUS;
 
-
 	public Perceptor(Robot robot) {
 		this.robot = robot;
+	}
+	
+	public RealPose2D getPose () {
+		return new RealPose2D(robot.getPosX(), robot.getPosY(), robot.getHeading());
 	}
 
 	public RealPoint2D[] getSonarObstacles() {
