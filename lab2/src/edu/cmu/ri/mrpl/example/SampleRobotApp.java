@@ -12,6 +12,8 @@ package edu.cmu.ri.mrpl.example;
 
 import java.io.*;
 import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.LinkedList;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Point2D;
@@ -20,6 +22,7 @@ import javax.swing.*;
 
 import edu.cmu.ri.mrpl.*;
 import edu.cmu.ri.mrpl.Robot;
+import edu.cmu.ri.mrpl.kinematics2D.Angle;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
 import static java.lang.Math.*;
 
@@ -42,11 +45,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 	private JButton stopButton;
 	private JButton quitButton;
-
-	private PauseTask pauseTask;
-	private WaitTask waitTask;
-	private TurnToTask turnToTask;
-	private GoToTask goToTask;
+	private JButton executeButton;
+	
+	private JFileChooser chooser;
+	
+	private java.util.Queue<Task> upcomingTasks;
 	
 	static final int DEFAULT_ROOM_SIZE = 4;
 	
@@ -54,6 +57,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 	public SampleRobotApp() {
 		super("Kick Ass Sample Robot App");
+		
+		upcomingTasks = new LinkedList<Task>();
 
 		connectButton = new JButton("connect");
 		disconnectButton = new JButton("disconnect");
@@ -63,13 +68,15 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		turnToButton = new JButton("Turn to angle!");
 		goToButton = new JButton("Go to distance!");
 		argumentField = new JFormattedTextField(NumberFormat.getInstance());
-		argumentField.setValue(0);
+		argumentField.setValue(1);
 		NumberFormat nf = NumberFormat.getInstance();
 		nf.setMaximumFractionDigits(2);
 		remainingField = new JFormattedTextField(nf);
 		remainingField.setEditable(false);
 		stopButton = new JButton(">> stop <<");
 		quitButton = new JButton(">> quit <<");
+		executeButton = new JButton("Execute File");
+		chooser = new JFileChooser();
 
 		connectButton.addActionListener(this);
 		disconnectButton.addActionListener(this);
@@ -80,6 +87,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		goToButton.addActionListener(this);
 		stopButton.addActionListener(this);
 		quitButton.addActionListener(this);
+		executeButton.addActionListener(this);
 
 		Container main = getContentPane();
 		main.setLayout(new BoxLayout(main, BoxLayout.Y_AXIS));
@@ -119,6 +127,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		
 		box = Box.createHorizontalBox();
 		main.add(box);
+		box.add(executeButton);
+
+		main.add(Box.createVerticalStrut(30));
+		
+		box = Box.createHorizontalBox();
+		main.add(box);
 		box.add(Box.createHorizontalStrut(30));
 		box.add(argumentField);
 		box.add(Box.createHorizontalStrut(30));
@@ -134,8 +148,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		box.add(quitButton);
 
 		main.add(Box.createVerticalStrut(30));
-
-
+		
 		this.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
 		this.addWindowListener(new WindowAdapter() {
 			public void windowClosing(WindowEvent e) {
@@ -156,12 +169,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		scFrame.add(sc);
 		scFrame.pack();
 		
-		// construct tasks
-		pauseTask = new PauseTask(this);
-		waitTask = new WaitTask(this);
-		turnToTask = new TurnToTask(this);
-		goToTask = new GoToTask(this);
-		
 		this.setVisible(true);
 
 		String message = "Is this running on the robot?";
@@ -172,6 +179,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		else {
 			robot = new SimRobot();
 		}
+		
+		robot.setAccel(0.25, 0.25);
 	}
 
 	// call from GUI thread
@@ -243,6 +252,16 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		});
 	}
 
+	private void startUpcomingTasks () {
+		System.out.println("startUpcomingTasks");
+		if (!upcomingTasks.isEmpty() && curTask == null) {
+			Task next = upcomingTasks.remove();
+			//if (canStart(next)) {
+				new Thread(next).start();
+			//}
+		}
+	}
+	
 	public void actionPerformed(ActionEvent e) {
 		Object source = e.getSource();
 		
@@ -257,19 +276,39 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		} else if ( source==quitButton ) {
 			quit();
 		} else if ( source==pauseButton ) {
-			(new Thread(pauseTask)).start();
+			upcomingTasks.add(new PauseTask(this));
 		} else if ( source==waitButton ) {
-			// read argument from text field
-			waitTask.setDuration(argument);
-			(new Thread(waitTask)).start();
+			upcomingTasks.add(new WaitTask(this, argument));
 		} else if ( source==turnToButton ) {
-			turnToTask.setDesiredAngle(argument);
-			(new Thread(turnToTask)).start();
+			upcomingTasks.add(new TurnToTask(this, argument));
 		} else if ( source==goToButton ) {
-			(new Thread(goToTask)).start();
+			upcomingTasks.add(new GoToTask(this, argument));
+		} else if ( source==executeButton ) {
+			addFileTasksToQueue();
 		}
+		
+		startUpcomingTasks();
 	}
 
+	public void addFileTasksToQueue() {
+		JFileChooser chooser = new JFileChooser();
+		int returnVal = chooser.showOpenDialog(this);
+	    if(returnVal == JFileChooser.APPROVE_OPTION) {
+	       System.out.println("You chose to open this file: " +
+	            chooser.getSelectedFile().getName());
+	    }
+	    
+	    CommandSequence commandSequence = new CommandSequence();
+	    
+	    try {
+	    	commandSequence.readFile(chooser.getSelectedFile().getPath());
+		} catch (IOException e) {
+			System.out.println("Couldn't read file");
+		}
+
+	    executeActionList(commandSequence);
+	}
+	
 	// TODO allow more than one task to run?
 	public synchronized boolean canStart(Task t) {
 		if (curTask!=null)
@@ -285,6 +324,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			return;
 		}
 		curTask=null;
+		startUpcomingTasks();
 		this.notifyAll();
 	}
 
@@ -294,6 +334,39 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				new SampleRobotApp();
 			}
 		});
+	}
+	
+	public void executeActionList (ArrayList<Command> commands) {
+		for (Command cmd : commands) {
+			System.out.println(cmd.type);
+			switch (cmd.type) {
+			case PAUSE:
+				upcomingTasks.add(new PauseTask(this));
+				break;
+			
+			case TURNTO:
+				upcomingTasks.add(new TurnToTask(this,
+					((Command.AngleArgument) cmd.argument).angle.angleValue()));
+				break;
+			
+			case GOTO:
+				upcomingTasks.add(new GoToTask(this,
+					((Command.LengthArgument) cmd.argument).d));
+				break;
+				
+			case WAIT:
+				upcomingTasks.add(new WaitTask(this,
+					((Command.LengthArgument) cmd.argument).d));
+				break;
+				
+			default:
+				System.err.println("unimplemented Command type: " + cmd.type);
+				new Speech().speak("unimplemented Command type: " + cmd.type);
+				break;
+			}
+		}
+		
+		startUpcomingTasks();
 	}
 
 	// here we implement the different robot controllers
@@ -310,8 +383,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 
 		public void taskRun() {
-			// XXX this doesn't work right now
-			//speech.speak("Waiting for you");
+			speech = new Speech();
+			speech.speak("Waiting for you");
 			done = false;
 			long startTime = System.currentTimeMillis();
 
@@ -360,8 +433,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		double duration;
 		private long startTime;
 
-		WaitTask(TaskController tc) {
+		WaitTask(TaskController tc, double d) {
 			super(tc);
+			setDuration(d);
 		}
 		
 		public void setDuration (double d) {
@@ -369,9 +443,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 
 		public void taskRun() {
-			//XXX this doesn't work now
-			//speech = new Speech();
-			sayDuration();
+			speech = new Speech();
+			speech.speak("Waiting " + AngleMath.roundTo2(duration) + " seconds");
 			startTime = System.currentTimeMillis();
 			double elapsed = elapsedTime();
 			
@@ -384,7 +457,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					// XXX is this the right place to update this box?
 					remainingField.setValue(duration - elapsed);
 					
-					
 					Thread.sleep(5);
 				} catch(InterruptedException iex) {
 					System.out.println("wait sleep interrupted");
@@ -392,14 +464,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 			// final update
 			remainingField.setText(duration - elapsed + "");
-		}
-		
-		private void sayDuration () {
-			// cut off past two significant figures
-			double roundedDuration = ((int) (duration*100)) / 100.0;
-			if (speech != null) {
-				speech.speak("Waiting " + roundedDuration + " seconds");
-			}
 		}
 
  		private double elapsedTime() {
@@ -413,60 +477,64 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 	class TurnToTask extends Task {
 		
+		Speech speech;
 		double desiredAngle;
 		Controller controller;
 
-		TurnToTask(TaskController tc) {
+		TurnToTask(TaskController tc, double a) {
 			super(tc);
+			setDesiredAngle(a);
 		}
 		
 		public void setDesiredAngle (double a) {
 			desiredAngle = a;
+			//System.out.println("desiredAngle: " + desiredAngle);
 		}
 
 		public void taskRun() {
+			speech = new Speech();
 			controller = new Controller(robot);
-			final double Kp = 0.4;
-			final double Kd = 50000000;
+			final double Kp = .5;
+			final double Kd = 110;
 			double u = 0;
 			robot.updateState();
-			double curAngle = robot.getHeading();
+			double curAngle = Angle.normalize(robot.getHeading());
 			double lastAngle = curAngle;
 			double curTime = System.nanoTime();
 			double lastTime = curTime;
-			double destAngle = curAngle + desiredAngle;
-			double angleErr = AngleMath.add(destAngle, -curAngle);
+			double destAngle = Angle.normalize(curAngle + desiredAngle);
+			//System.out.println("destAngle: " + destAngle);
+			double angleErr = Angle.normalize(destAngle - curAngle);
 			
-			final double ANGLE_TOLERANCE = 0.05;
+			final double ANGLE_TOLERANCE = 0.01;
+			final double SPEED_TOLERANCE = 0.01;
 
 			while(!shouldStop() &&
-					(abs(angleErr) > ANGLE_TOLERANCE 
-							|| robot.getVelLeft() != 0) )
+					(abs(angleErr) > ANGLE_TOLERANCE
+					|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
 			{
+				//System.out.println("angleErr = " + angleErr);
 				robot.updateState();
 				lastAngle = curAngle;
 				lastTime = curTime;
-				curAngle = robot.getHeading();
-				curTime = System.nanoTime();
-				angleErr = AngleMath.add(destAngle, -curAngle);
+				curAngle = Angle.normalize(robot.getHeading());
+				//curTime = System.nanoTime();
+				curTime = System.currentTimeMillis();
+				angleErr = Angle.normalize(destAngle - curAngle);
 				
-				double angleTraveled = AngleMath.add(curAngle, -lastAngle);
+				double angleTraveled = Angle.normalize(curAngle - lastAngle);
 				boolean progressMade = signum(angleTraveled) == signum(angleErr);
 
-				double pterm = Kp*angleErr;
+				double pterm = Kp*abs(angleErr);
 				double dterm = Kd*(abs(angleTraveled))/(curTime-lastTime);
 				if (progressMade) {
 					dterm *= -1;
 				}
-				System.err.println(dterm);
-				/*
-				u = pterm;
-				/*/
+				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
 				u = pterm + dterm;
-				//*/
 				double direction = signum(angleErr);
 				//System.err.println(angleErr + " off, speed = " + u*direction);
-				double speed = u;
+				double speed = direction*u;
 				controller.setVel(-speed, speed);
 				
 				try {
@@ -476,17 +544,15 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 			}
 			
-			// TODO speak error aloud
+			// TODO error should be in milliradians?
+			speech.speak("remaining error " + AngleMath.roundTo2(angleErr*1000) + " milliradians");
+			//System.out.println("curAngle: " + curAngle);
 			controller.stop();
 		}
 
 		public String toString() {
 			return "turn-to";
 		}
-	}
-	
-	private enum WallFollowState {
-		GO, TURN, STOP
 	}
 
 	class GoToTask extends Task {
@@ -495,60 +561,58 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		RealPose2D robotStartedHere;
 		Controller controller;
 		Perceptor perceptor;
+		Speech speech;
 
-		GoToTask(TaskController tc) {
+		GoToTask(TaskController tc, double d) {
 			super(tc);
+			setDesiredDistance(d);
 		}
 		
 		public void setDesiredDistance (double d) {
-			desiredDistance = d;
-			robotStartedHere = perceptor.getPose();
-		}
-
-		public void taskRun() {
 			controller = new Controller(robot);
 			perceptor = new Perceptor(robot);
-			final double Kp = 0.4;
-			final double Kd = 50000000;
+			desiredDistance = d;
+		}
+
+		// setDesiredDistance should be called before calling this method
+		public void taskRun() {
+			speech = new Speech();
+			robot.updateState();
+			final double Kp = 1;
+			final double Kd = 10;
 			double u = 0;
-			RealPose2D curPose = perceptor.getPose();
-			RealPose2D lastPose = curPose;
+			robotStartedHere = perceptor.getWorldPose();
+			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
+			RealPose2D lastPoseRelStart = curPoseRelStart;
 			double curTime = System.nanoTime();
 			double lastTime = curTime;
-			Point2D destPoint = curPose.transform(new Point2D.Double(desiredDistance, 0), null);
-			double distanceErr = curPose.getPosition().distance(destPoint);
+			final Point2D destPointRelStart = new Point2D.Double(desiredDistance, 0);
+			double distanceErr = destPointRelStart.getX() - curPoseRelStart.getX();
 			
-			final double DISTANCE_TOLERANCE = 0.05;
+			final double DISTANCE_TOLERANCE = 0.01;
+			final double SPEED_TOLERANCE = 0.01;
 
 			while(!shouldStop() &&
-					(abs(distanceErr) > DISTANCE_TOLERANCE 
-							|| robot.getVelLeft() != 0) )
+					(abs(distanceErr) > DISTANCE_TOLERANCE
+					|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
 			{
 				robot.updateState();
-				lastPose = curPose;
+				lastPoseRelStart = curPoseRelStart;
 				lastTime = curTime;
-				curPose = perceptor.getPose();
-				curTime = System.nanoTime();
-				distanceErr = curPose.inverseTransform(destPoint, null).getX();
-						
-				// XXX this is always positive right now
-				// this means that the dterm won't work right
-				double distanceTraveled = curPose.getPosition().distance(lastPose.getPosition());
+				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
+				curTime = System.currentTimeMillis();
+				distanceErr = destPointRelStart.getX() - curPoseRelStart.getX();
+				
+				double distanceTraveled = curPoseRelStart.getX() - lastPoseRelStart.getX();
 				boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
 
 				double pterm = Kp*distanceErr;
 				double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
 				if (progressMade) {
-					dterm *= -1;
 				}
-				System.err.println(dterm);
-				//*
-				u = pterm;
-				/*/
+					dterm *= -1;
+				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
 				u = pterm + dterm;
-				//*/
-				double direction = signum(distanceErr);
-				//System.err.println(angleErr + " off, speed = " + u*direction);
 				double speed = u;
 				controller.setVel(speed, speed);
 				
@@ -560,6 +624,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 			
 			// TODO speak error aloud
+			speech.speak("remaining error " + AngleMath.roundTo2(distanceErr*1000) + " millimeters");
 			controller.stop();
 		}
 

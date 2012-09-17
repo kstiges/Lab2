@@ -19,13 +19,8 @@ public class Controller {
 			double scaleFactor = MAX_SPEED / maxVel;
 			leftVel *= scaleFactor;
 			rightVel *= scaleFactor;
-			/*
-			leftVel = min(leftVel, MAX_SPEED);
-			rightVel = min(rightVel, MAX_SPEED);
-			leftVel = max(leftVel, -MAX_SPEED);
-			rightVel = max(rightVel, -MAX_SPEED);
-			*/
 		}
+		//System.err.println("setVel: " + leftVel + " " + rightVel);
 		robot.setVel(leftVel, rightVel);
 	}
 	

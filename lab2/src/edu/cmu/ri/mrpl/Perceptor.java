@@ -19,8 +19,16 @@ public class Perceptor {
 		this.robot = robot;
 	}
 	
-	public RealPose2D getPose () {
+	// returns the pose of the robot in the world frame
+	public RealPose2D getWorldPose () {
 		return new RealPose2D(robot.getPosX(), robot.getPosY(), robot.getHeading());
+	}
+	
+	// returns the pose of the robot in the argument frame (which is given relative to the world frame)
+	public RealPose2D getRelPose (RealPose2D frame) {
+		RealPose2D robotRelWorld = getWorldPose();
+		RealPose2D inverseFrame = frame.inverse();
+		return RealPose2D.multiply(inverseFrame, robotRelWorld);
 	}
 
 	public RealPoint2D[] getSonarObstacles() {
