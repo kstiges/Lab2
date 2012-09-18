@@ -252,13 +252,19 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		});
 	}
 
+	// XXX this doesn't work quite right if called multiple times when the task list is non-empty
+	// something to do with how canStart works vs checking for a null curTask
 	private void startUpcomingTasks () {
-		System.out.println("startUpcomingTasks");
+		System.err.println("startUpcomingTasks");
 		if (!upcomingTasks.isEmpty() && curTask == null) {
 			Task next = upcomingTasks.remove();
+			System.err.println("attempting to start " + next);
 			//if (canStart(next)) {
 				new Thread(next).start();
 			//}
+		}
+		else {
+			System.err.println("no more tasks left or task is currently running");
 		}
 	}
 	
@@ -277,17 +283,19 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			quit();
 		} else if ( source==pauseButton ) {
 			upcomingTasks.add(new PauseTask(this));
+			startUpcomingTasks();
 		} else if ( source==waitButton ) {
 			upcomingTasks.add(new WaitTask(this, argument));
+			startUpcomingTasks();
 		} else if ( source==turnToButton ) {
 			upcomingTasks.add(new TurnToTask(this, argument));
+			startUpcomingTasks();
 		} else if ( source==goToButton ) {
 			upcomingTasks.add(new GoToTask(this, argument));
+			startUpcomingTasks();
 		} else if ( source==executeButton ) {
 			addFileTasksToQueue();
 		}
-		
-		startUpcomingTasks();
 	}
 
 	public void addFileTasksToQueue() {
@@ -303,7 +311,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	    try {
 	    	commandSequence.readFile(chooser.getSelectedFile().getPath());
 		} catch (IOException e) {
-			System.out.println("Couldn't read file");
+			System.err.println("Couldn't read file");
 		}
 
 	    executeActionList(commandSequence);
@@ -338,7 +346,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	
 	public void executeActionList (ArrayList<Command> commands) {
 		for (Command cmd : commands) {
-			System.out.println(cmd.type);
+			System.err.println(cmd.type);
 			switch (cmd.type) {
 			case PAUSE:
 				upcomingTasks.add(new PauseTask(this));
@@ -396,7 +404,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				try {
 					Thread.sleep(50);
 				} catch(InterruptedException iex) {
-					System.out.println("pause sleep interrupted");
+					System.err.println("pause sleep interrupted");
 				}
 			}
 			
@@ -459,7 +467,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					
 					Thread.sleep(5);
 				} catch(InterruptedException iex) {
-					System.out.println("wait sleep interrupted");
+					System.err.println("wait sleep interrupted");
 				}
 			}
 			// final update
@@ -471,7 +479,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 
 		public String toString() {
-			return "wait task";
+			return "wait task: " + duration;
 		}
 	}
 
@@ -540,7 +548,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				try {
 					Thread.sleep(5);
 				} catch(InterruptedException iex) {
-					System.out.println("turn-to sleep interrupted");
+					System.err.println("turn-to sleep interrupted");
 				}
 			}
 			
@@ -551,7 +559,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 
 		public String toString() {
-			return "turn-to";
+			return "turn-to task: " + desiredAngle;
 		}
 	}
 
@@ -578,7 +586,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		public void taskRun() {
 			speech = new Speech();
 			robot.updateState();
-			final double Kp = 1;
+			// XXX changed this from 1 to 2
+			final double Kp = 2;
 			final double Kd = 10;
 			double u = 0;
 			robotStartedHere = perceptor.getWorldPose();
@@ -619,7 +628,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				try {
 					Thread.sleep(5);
 				} catch(InterruptedException iex) {
-					System.out.println("go-to sleep interrupted");
+					System.err.println("go-to sleep interrupted");
 				}
 			}
 			
@@ -629,7 +638,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 
 		public String toString() {
-			return "go-to";
+			return "go-to task: " + desiredDistance;
 		}
 	}
 	
