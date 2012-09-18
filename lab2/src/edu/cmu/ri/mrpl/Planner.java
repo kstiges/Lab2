@@ -77,6 +77,7 @@ public class Planner {
 	
 	public static Pair<Double, Area>[] curvaturesToAreas (double[] curvatures)
 	{
+		@SuppressWarnings("unchecked")
 		Pair<Double, Area>[] result = new Pair[curvatures.length];
 		
 		for(int i = 0; i < curvatures.length; i++)
@@ -88,12 +89,12 @@ public class Planner {
 	}
 	
 	public static class CurvPathComparator implements Comparator<Pair<Double, Area>> {
-		private double currentCurvature;
+		//private double currentCurvature;
 		private Area[] cSpaceObstacles;
 		private Map<Area, Double> minCollisionDistances;
 		
 		public CurvPathComparator (double currentCurvature, Area[] cSpaceObstacles) {
-			this.currentCurvature = currentCurvature;
+			//this.currentCurvature = currentCurvature;
 			this.cSpaceObstacles = cSpaceObstacles;
 			minCollisionDistances = new HashMap<Area, Double>();
 		}

@@ -1,13 +1,11 @@
 package edu.cmu.ri.mrpl.util;
 
-// TODO fix this to allow overwrites
-
-
 public class RingBuffer<T> {
 	int capacity;
 	T[] array;
 	int index;
 	
+	@SuppressWarnings("unchecked")
 	public RingBuffer (int capacity) {
 		this.capacity = capacity;
 		array = (T[]) new Object[capacity];

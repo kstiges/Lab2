@@ -24,6 +24,7 @@ import edu.cmu.ri.mrpl.*;
 import edu.cmu.ri.mrpl.Robot;
 import edu.cmu.ri.mrpl.kinematics2D.Angle;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
+import edu.cmu.ri.mrpl.util.AngleMath;
 import static java.lang.Math.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
@@ -46,8 +47,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	private JButton stopButton;
 	private JButton quitButton;
 	private JButton executeButton;
-	
-	private JFileChooser chooser;
 	
 	private java.util.Queue<Task> upcomingTasks;
 	
@@ -76,7 +75,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		stopButton = new JButton(">> stop <<");
 		quitButton = new JButton(">> quit <<");
 		executeButton = new JButton("Execute File");
-		chooser = new JFileChooser();
 
 		connectButton.addActionListener(this);
 		disconnectButton.addActionListener(this);
@@ -398,6 +396,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			// XXX these only catch events on the specific object
 			pauseButton.addKeyListener(this);
+			SampleRobotApp.this.addKeyListener(this);
 			SampleRobotApp.this.addMouseListener(this);
 
 			while(!shouldStop() && !done) {
@@ -419,6 +418,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 		public void keyPressed(KeyEvent e) {
 			done = true;
+			pauseButton.removeKeyListener(this);
 			SampleRobotApp.this.removeKeyListener(this);
 		}
 		
@@ -502,8 +502,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		public void taskRun() {
 			speech = new Speech();
 			controller = new Controller(robot);
-			final double Kp = .5;
-			final double Kd = 110;
+			final double Kp = .4;
+			final double Kd = 95;
 			double u = 0;
 			robot.updateState();
 			double curAngle = Angle.normalize(robot.getHeading());
@@ -553,7 +553,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 			
 			// TODO error should be in milliradians?
-			speech.speak("remaining error " + AngleMath.roundTo2(angleErr*1000) + " milliradians");
+			speech.speak("error " + AngleMath.roundTo2(angleErr*1000) + " milliradians");
 			//System.out.println("curAngle: " + curAngle);
 			controller.stop();
 		}
@@ -586,9 +586,10 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		public void taskRun() {
 			speech = new Speech();
 			robot.updateState();
-			// XXX changed this from 1 to 2
-			final double Kp = 2;
-			final double Kd = 10;
+			// XXX changed this from 1
+			final double Kp = 1.5;
+			// XXX changed this from 10
+			final double Kd = 15;
 			double u = 0;
 			robotStartedHere = perceptor.getWorldPose();
 			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
@@ -598,7 +599,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			final Point2D destPointRelStart = new Point2D.Double(desiredDistance, 0);
 			double distanceErr = destPointRelStart.getX() - curPoseRelStart.getX();
 			
-			final double DISTANCE_TOLERANCE = 0.01;
+			final double DISTANCE_TOLERANCE = 0.005;
 			final double SPEED_TOLERANCE = 0.01;
 
 			while(!shouldStop() &&
@@ -632,8 +633,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 			}
 			
-			// TODO speak error aloud
-			speech.speak("remaining error " + AngleMath.roundTo2(distanceErr*1000) + " millimeters");
+			speech.speak("error " + AngleMath.roundTo2(distanceErr*1000) + " millimeters");
 			controller.stop();
 		}
 
