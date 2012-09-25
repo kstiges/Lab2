@@ -58,9 +58,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	private JButton quitButton;
 	private JButton executeButton;
 
-	private java.util.Queue<Task> upcomingTasks;
+	private java.util.LinkedList<Task> upcomingTasks;
 
 	static final int DEFAULT_ROOM_SIZE = 4;
+	
+	final double DISTANCE_TOLERANCE = 0.01;
+	final double ANGLE_TOLERANCE = 0.01;
+	final double SPEED_TOLERANCE = 0.01;
 
 	private Task curTask = null;
 
@@ -229,6 +233,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 	// call from GUI thread
 	public synchronized void stop() {
+		upcomingTasks.clear();
 		if (curTask!=null)
 			curTask.pleaseStop();
 	}
@@ -438,7 +443,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			done = false;
 			long startTime = System.currentTimeMillis();
 
-			// XXX these only catch events on the specific object
+			// these only catch events on the specific object
 			pauseButton.addKeyListener(this);
 			SampleRobotApp.this.addKeyListener(this);
 			SampleRobotApp.this.addMouseListener(this);
@@ -681,185 +686,131 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			return "go-to task: " + desiredDistance;
 		}
 	}
+	
+	private static double calculateArcLength (Point2D dest, double radius) {
+		double x = dest.getX();
+		double y = dest.getY();
+		double angle;
+		if (radius > 0) {
+			angle = Math.atan2(x, radius - y);
+		}
+		else {
+			angle = Math.atan2(x, y - radius);
+		}
+		double arcLength = radius*angle;
+		if (radius < 0) {
+			arcLength *= -1;
+		}
+		return arcLength;
+	}
 
+	// returns the radius and arc length to get to a given point relative to the robot
+	private static double[] calculateArc (Point2D dest) {
+		double x = dest.getX();
+		double y = dest.getY();
+		if (y == 0) {
+			return new double[]{Double.MAX_VALUE, x};
+		}
+		double radius = (x*x + y*y) / (2*y);
+		double arcLength = calculateArcLength(dest, radius);
+		if (arcLength < 0) {
+			System.err.println("NEGATIVE ARC LENGTH");
+		}
+		return new double[]{radius, arcLength};
+	}
+	
 	class PoseToTask extends Task {
-		RealPose2D desiredPose;
-		RealPose2D robotStartedHere;
+		RealPose2D destPoseRelStart;
 		Controller controller;
 		Perceptor perceptor;
 		Speech speech;
+		TaskController tc;
 
 		PoseToTask(TaskController tc, double x, double y, double th) {
 			super(tc);
+			this.tc = tc;
 			setDesiredPose(x,y,th);
 		}
 
 		public void setDesiredPose (double x, double y, double th) {
 			controller = new Controller(robot);
 			perceptor = new Perceptor(robot);
-			desiredPose = new RealPose2D(x,y,th);
+			destPoseRelStart = new RealPose2D(x,y,th);
 		}
 
 		// setDesiredPose should be called before calling this method
 		public void taskRun() {
 			speech = new Speech();
 			robot.updateState();
-			double Kp = 2;
-			double Kd = 10;
-			double u = 0;
-
-			robotStartedHere = perceptor.getWorldPose();
-			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-			//RealPose2D lastPoseRelStart = curPoseRelStart;
-			double curTime = System.currentTimeMillis();
-			double lastTime = curTime;
-			final RealPose2D destPoseRelStart = desiredPose;
-			double distanceErr;
-
-			double destR = (pow(destPoseRelStart.getX(),2) +
-					pow(destPoseRelStart.getY(),2))/(2*destPoseRelStart.getY());
 			
-			double curv = 1.0/destR;
-			double destArcAngle;
-			double curArcAngle = 0;
-			double lastArcAngle;
-			if(destR >= 0)
-				destArcAngle = atan2(destPoseRelStart.getX(), destR -
-						destPoseRelStart.getY());
-			else
-				destArcAngle = atan2(destPoseRelStart.getX(), -destR +
-						destPoseRelStart.getY());
+			final double Kp = 2;
+			final double Kd = 10;
 
-			double dist = destR*destArcAngle;
-			distanceErr = dist;
-
-
-			//System.out.println("destR= "+destR+", dist= "+dist+", destArcAngle="+destArcAngle);
-
-			final double DISTANCE_TOLERANCE = 0.01;
-			double SPEED_TOLERANCE = 0.01;
-
-			while(!shouldStop() &&
-					(abs(distanceErr) > DISTANCE_TOLERANCE
-							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
-			{
-				robot.updateState();
-				//lastPoseRelStart = curPoseRelStart;
+			RealPose2D robotStartedHere = perceptor.getWorldPose();
+			RealPose2D curPoseRelStart = new RealPose2D();
+            RealPose2D lastPoseRelStart;
+            double curTime = System.nanoTime();
+            double lastTime;
+            
+			// calculate arc info
+            double[] arcInfo = calculateArc(destPoseRelStart.getPosition());
+			double radius = arcInfo[0];
+			double distanceErr = arcInfo[1];
+			System.err.printf("arc: radius=%.2f, distanceErr=%.2f\n", radius, distanceErr);
+			
+			do {
+				// update everything
+				lastPoseRelStart = curPoseRelStart;
 				lastTime = curTime;
+				robot.updateState();
 				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
 				curTime = System.currentTimeMillis();
 				
-				// recalculate the curvature
-				RealPose2D destPoseRelCur = RealPose2D.multiply(robotStartedHere.inverse(), desiredPose);
+				// figure out how far we've been
+				RealPose2D curPoseRelLast = RealPose2D.multiply(
+						lastPoseRelStart.inverse(), curPoseRelStart);
+				double distanceTraveled = calculateArcLength(curPoseRelLast.getPosition(), radius);
 				
-				destR = (pow(destPoseRelCur.getX(),2) +
-						pow(destPoseRelCur.getY(),2))/(2*destPoseRelCur.getY());
-				
-				curv = 1.0/destR;
+				// compute whether progress has been made
+				RealPose2D destPoseRelCur = RealPose2D.multiply(
+						curPoseRelStart.inverse(), destPoseRelStart);
+				distanceErr = calculateArcLength(destPoseRelCur.getPosition(), radius);
+		        boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
 
-				if(destR >= 0)
-					destArcAngle = atan2(destPoseRelCur.getX(), destR -
-							destPoseRelCur.getY());
-				else
-					destArcAngle = atan2(destPoseRelCur.getX(), -destR +
-							destPoseRelCur.getY());
-				
-				lastArcAngle = curArcAngle;
-				if(destR >= 0)
-					curArcAngle = atan2(curPoseRelStart.getX(), destR -
-							curPoseRelStart.getY());
-				else
-					curArcAngle = atan2(curPoseRelStart.getX(), -destR +
-							curPoseRelStart.getY());
-
-				distanceErr = destR*(Angle.normalize(destArcAngle-curArcAngle));
-
-				//System.out.println("destR= "+destR+", distanceErr= "+distanceErr+", curArcAngle="+curArcAngle);
-
-				double distanceTraveled = destR*Angle.normalize(curArcAngle - lastArcAngle);
-				boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
-
+				// calculate dterm
+		        double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
+		        if (progressMade) {
+		        	dterm *= -1;
+		        }
+		        
+				// set wheel speeds
 				double pterm = Kp*distanceErr;
-				double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
-				if (progressMade) {
-					dterm *= -1;
-				}
-				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
-				u = pterm;// + dterm;
-				double speed = u;
-				controller.setCurvVel(curv, speed);
+				double speed = pterm;// + dterm;
+				controller.setCurvVel(1.0/radius, speed);
 
 				try {
 					Thread.sleep(5);
 				} catch(InterruptedException iex) {
 					System.err.println("go-to sleep interrupted");
 				}
-			}
+			} while(!shouldStop() &&
+					(abs(distanceErr) > DISTANCE_TOLERANCE
+							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE));
+
 			System.out.println("Current x = "+curPoseRelStart.getX());
 			System.out.println("Current y = "+curPoseRelStart.getY());
 			System.out.println("FINISHED X/Y. STARTING THETA");
 
-			// XXX copied code from TurnToTask.
-			// Check whether the "rapid transition" rule is broken here.
-			Kp = .4;
-			Kd = 95;
-			u = 0;
-			robot.updateState();
-			double curAngle = Angle.normalize(robot.getHeading());
-			double lastAngle = curAngle;
-			curTime = System.nanoTime();
-			lastTime = curTime;
-			curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-			double desiredAngle = Angle.normalize(desiredPose.getTh() - curPoseRelStart.getTh());
-			double destAngle = Angle.normalize(curAngle + desiredAngle);
-			//System.out.println("destAngle: " + destAngle);
-			double angleErr = Angle.normalize(destAngle - curAngle);
-
-			final double ANGLE_TOLERANCE = 0.01;
-			SPEED_TOLERANCE = 0.01;
-
-			while(!shouldStop() &&
-					(abs(angleErr) > ANGLE_TOLERANCE
-							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
-			{
-				//System.out.println("angleErr = " + angleErr);
-				robot.updateState();
-				lastAngle = curAngle;
-				lastTime = curTime;
-				curAngle = Angle.normalize(robot.getHeading());
-				//curTime = System.nanoTime();
-				curTime = System.currentTimeMillis();
-				angleErr = Angle.normalize(destAngle - curAngle);
-
-				double angleTraveled = Angle.normalize(curAngle - lastAngle);
-				boolean progressMade = signum(angleTraveled) == signum(angleErr);
-
-				double pterm = Kp*abs(angleErr);
-				double dterm = Kd*(abs(angleTraveled))/(curTime-lastTime);
-				if (progressMade) {
-					dterm *= -1;
-				}
-				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
-				u = pterm + dterm;
-				double direction = signum(angleErr);
-				//System.err.println(angleErr + " off, speed = " + u*direction);
-				double speed = direction*u;
-				controller.setVel(-speed, speed);
-
-				try {
-					Thread.sleep(5);
-				} catch(InterruptedException iex) {
-					System.err.println("pose-to (turn) sleep interrupted");
-				}
-			}
-
 			speech.speak("remaining error " + AngleMath.roundTo2(distanceErr*1000)
 					+ " millimeters");
+			
+			upcomingTasks.add(0, new TurnToTask(tc, Angle.normalize(
+					destPoseRelStart.getTh() + robotStartedHere.getTh() - robot.getHeading())));
 			controller.stop();
 		}
 
 		public String toString() {
-			return "pose-to task: " + desiredPose;
+			return "pose-to task: " + destPoseRelStart;
 		}
 	}
 
@@ -917,6 +868,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			return closestPoint;
 		}
 		
+		// TODO make this work properly. wtf
 		private Point2D findLookaheadPoint () {
 			Point2D closestPoint = findClosestPoint();
 			ArrayList<Vector2D> points = new ArrayList<Vector2D>();
@@ -943,53 +895,27 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			return new RealPoint2D(lookaheadPoint.x, lookaheadPoint.y);
 		}
 
-		// setDesiredPose should be called before calling this method
+		// setDesiredPath should be called before calling this method
 		public void taskRun() {
 			speech = new Speech();
 			robot.updateState();
 			double Kp = 2;
-			double Kd = 10;
-			double u = 0;
+			//double Kd = 10;
+			//double u = 0;
 
 			robotStartedHere = perceptor.getWorldPose();
 			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-			//RealPose2D lastPoseRelStart = curPoseRelStart;
-			double curTime = System.currentTimeMillis();
-			double lastTime = curTime;
 			Point2D destPointRelStart = findLookaheadPoint();
-			double distanceErr;
 
-			double destR = (pow(destPointRelStart.getX(),2) +
-					pow(destPointRelStart.getY(),2))/(2*destPointRelStart.getY());
-			
-			double curv = 1.0/destR;
-			double destArcAngle;
-			double curArcAngle = 0;
-			double lastArcAngle;
-			if(destR >= 0)
-				destArcAngle = atan2(destPointRelStart.getX(), destR -
-						destPointRelStart.getY());
-			else
-				destArcAngle = atan2(destPointRelStart.getX(), -destR +
-						destPointRelStart.getY());
-
-			double dist = destR*destArcAngle;
-			distanceErr = dist;
-
-			//System.out.println("destR= "+destR+", dist= "+dist+", destArcAngle="+destArcAngle);
-
-			final double DISTANCE_TOLERANCE = 0.01;
-			double SPEED_TOLERANCE = 0.005;
+			double[] arcInfo = calculateArc(destPointRelStart);
+			double distanceErr = arcInfo[1];
 
 			while(!shouldStop() &&
 					(abs(distanceErr) > DISTANCE_TOLERANCE
 							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
 			{
 				robot.updateState();
-				//lastPoseRelStart = curPoseRelStart;
-				lastTime = curTime;
 				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-				curTime = System.currentTimeMillis();
 				
 				// remove the old lookahead point
 				if (robot instanceof SimRobot) {
@@ -1005,46 +931,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						((SimRobot) robot).addObstacle(destPointRelStart.getX(), destPointRelStart.getY(), 0.01);
 					}
 				}
-
-				destR = (pow(destPointRelStart.getX(),2) +
-						pow(destPointRelStart.getY(),2))/(2*destPointRelStart.getY());
 				
-				curv = 1.0/destR;
-				curArcAngle = 0;
-				if(destR >= 0)
-					destArcAngle = atan2(destPointRelStart.getX(), destR -
-							destPointRelStart.getY());
-				else
-					destArcAngle = atan2(destPointRelStart.getX(), -destR +
-							destPointRelStart.getY());
-
-				dist = destR*destArcAngle;
-				// finished recalculating destination
-
-				lastArcAngle = curArcAngle;
-				if(destR >= 0)
-					curArcAngle = atan2(curPoseRelStart.getX(), destR -
-							curPoseRelStart.getY());
-				else
-					curArcAngle = atan2(curPoseRelStart.getX(), -destR +
-							curPoseRelStart.getY());
-
-				distanceErr = destR*Angle.normalize(destArcAngle-curArcAngle);
-
-				//System.out.println("destR= "+destR+", distanceErr= "+distanceErr+", curArcAngle="+curArcAngle);
-
-				double distanceTraveled = destR*Angle.normalize(curArcAngle - lastArcAngle);
-				boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
-
-				double pterm = Kp*distanceErr;
-				double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
-				if (progressMade) {
-					dterm *= -1;
-				}
-				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
-				u = pterm;// + dterm;
-				double speed = u;
-				controller.setCurvVel(curv, speed);
+				arcInfo = calculateArc(destPointRelStart);
+				controller.setCurvVel(1.0/arcInfo[0], Kp*arcInfo[1]);
 
 				try {
 					Thread.sleep(5);
