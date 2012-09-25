@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
 
 import javax.swing.*;
@@ -25,7 +26,10 @@ import javax.swing.*;
 import edu.cmu.ri.mrpl.*;
 import edu.cmu.ri.mrpl.Robot;
 import edu.cmu.ri.mrpl.kinematics2D.Angle;
+import edu.cmu.ri.mrpl.kinematics2D.LineSegment;
+import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
+import edu.cmu.ri.mrpl.kinematics2D.Vector2D;
 import edu.cmu.ri.mrpl.util.AngleMath;
 import static java.lang.Math.*;
 
@@ -343,7 +347,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		executeActionList(commandSequence);
 	}
 
-	// TODO allow more than one task to run?
 	public synchronized boolean canStart(Task t) {
 		if (curTask!=null)
 			return false;
@@ -391,6 +394,19 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			case WAIT:
 				upcomingTasks.add(new WaitTask(this,
 						((Command.LengthArgument) cmd.argument).d));
+				break;
+				
+			case POSETO:
+				RealPose2D pose = ((Command.PoseArgument) cmd.argument).pose;
+				upcomingTasks.add(new PoseToTask(this,
+						pose.getX(),
+						pose.getY(),
+						pose.getTh()));
+				break;
+				
+			case FOLLOWPATH:
+				Path path = ((Command.PathArgument) cmd.argument).path;
+				upcomingTasks.add(new FollowPathTask(this, path, 0.1));
 				break;
 
 			default:
@@ -490,7 +506,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					break;
 				}
 				try {
-					// XXX is this the right place to update this box?
 					remainingField.setValue(duration - elapsed);
 
 					Thread.sleep(5);
@@ -580,7 +595,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 			}
 
-			// TODO error should be in milliradians?
 			speech.speak("error " + AngleMath.roundTo2(angleErr*1000) + " milliradians");
 			//System.out.println("curAngle: " + curAngle);
 			controller.stop();
@@ -614,9 +628,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		public void taskRun() {
 			speech = new Speech();
 			robot.updateState();
-			// XXX changed this from 1
 			final double Kp = 1.5;
-			// XXX changed this from 10
 			final double Kd = 15;
 			double u = 0;
 			robotStartedHere = perceptor.getWorldPose();
@@ -692,7 +704,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		public void taskRun() {
 			speech = new Speech();
 			robot.updateState();
-			// XXX changed this from 1 to 2
 			double Kp = 2;
 			double Kd = 10;
 			double u = 0;
@@ -737,7 +748,22 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				lastTime = curTime;
 				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
 				curTime = System.currentTimeMillis();
+				
+				// recalculate the curvature
+				RealPose2D destPoseRelCur = RealPose2D.multiply(robotStartedHere.inverse(), desiredPose);
+				
+				destR = (pow(destPoseRelCur.getX(),2) +
+						pow(destPoseRelCur.getY(),2))/(2*destPoseRelCur.getY());
+				
+				curv = 1.0/destR;
 
+				if(destR >= 0)
+					destArcAngle = atan2(destPoseRelCur.getX(), destR -
+							destPoseRelCur.getY());
+				else
+					destArcAngle = atan2(destPoseRelCur.getX(), -destR +
+							destPoseRelCur.getY());
+				
 				lastArcAngle = curArcAngle;
 				if(destR >= 0)
 					curArcAngle = atan2(curPoseRelStart.getX(), destR -
@@ -746,11 +772,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					curArcAngle = atan2(curPoseRelStart.getX(), -destR +
 							curPoseRelStart.getY());
 
-				distanceErr = destR*(destArcAngle-curArcAngle);
+				distanceErr = destR*(Angle.normalize(destArcAngle-curArcAngle));
 
 				//System.out.println("destR= "+destR+", distanceErr= "+distanceErr+", curArcAngle="+curArcAngle);
 
-				double distanceTraveled = destR*(curArcAngle - lastArcAngle);
+				double distanceTraveled = destR*Angle.normalize(curArcAngle - lastArcAngle);
 				boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
 
 				double pterm = Kp*distanceErr;
@@ -784,7 +810,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			curTime = System.nanoTime();
 			lastTime = curTime;
 			curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-			double desiredAngle = desiredPose.getTh() - curPoseRelStart.getTh();
+			double desiredAngle = Angle.normalize(desiredPose.getTh() - curPoseRelStart.getTh());
 			double destAngle = Angle.normalize(curAngle + desiredAngle);
 			//System.out.println("destAngle: " + destAngle);
 			double angleErr = Angle.normalize(destAngle - curAngle);
@@ -827,7 +853,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 			}
 
-			// TODO speak error aloud
 			speech.speak("remaining error " + AngleMath.roundTo2(distanceErr*1000)
 					+ " millimeters");
 			controller.stop();
@@ -838,5 +863,264 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 	}
 
+	class FollowPathTask extends Task {
+		ArrayList<RealPose2D> desiredPath;
+		ArrayList<Line2D> pathSegments;
+		double maxDeviation;
+		RealPose2D robotStartedHere;
+		Controller controller;
+		Perceptor perceptor;
+		Speech speech;
+		
+		private final double LOOKAHEAD_DISTANCE = 0.25;
+		private Line2D closestSegment;
+
+		FollowPathTask(TaskController tc, ArrayList<RealPose2D> poses, double maxDeviation) {
+			super(tc);
+			setDesiredPath(poses, maxDeviation);
+		}
+
+		public void setDesiredPath (ArrayList<RealPose2D> poses, double maxDeviation) {
+			controller = new Controller(robot);
+			perceptor = new Perceptor(robot);
+			desiredPath = new ArrayList<RealPose2D>(poses);
+			this.maxDeviation = maxDeviation;
+			
+			// construct list of line segments
+			pathSegments = new ArrayList<Line2D>();
+			for (int i = 1; i < desiredPath.size(); i++) {
+				pathSegments.add(new Line2D.Double(desiredPath.get(i-1).getPosition(),
+						desiredPath.get(i).getPosition()));
+			}
+			System.err.println(desiredPath.size() + " PATH SEGMENTS");
+		}
+		
+		private RealPoint2D findClosestPoint () {
+			RealPoint2D closestPoint = new RealPoint2D();
+			double minDistSquared = Double.MAX_VALUE;
+			Point2D robotRelWorld = perceptor.getWorldPose().getPosition();
+			Line2D oldClosestSegment = closestSegment;
+			for (int i = 0; i < pathSegments.size(); i++) {
+				Line2D segment = pathSegments.get(i);
+				RealPoint2D tmp = new RealPoint2D();
+				double tmpDistSquared = LineSegment.closestPointOnLineSegment(segment, robotRelWorld, tmp);
+				if (tmpDistSquared <= minDistSquared) {
+					minDistSquared = tmpDistSquared;
+					closestPoint.setLocation(tmp);
+					closestSegment = segment;
+				}
+			}
+			if (oldClosestSegment != null && !closestSegment.equals(oldClosestSegment)) {
+				System.out.printf("CHANGING SEGMENTS FROM %d to %d\n",
+						pathSegments.indexOf(oldClosestSegment), pathSegments.indexOf(closestSegment));
+			}
+			return closestPoint;
+		}
+		
+		private Point2D findLookaheadPoint () {
+			Point2D closestPoint = findClosestPoint();
+			ArrayList<Vector2D> points = new ArrayList<Vector2D>();
+			double lookaheadDistance = LOOKAHEAD_DISTANCE;
+			Vector2D lookaheadPoint = new Vector2D(closestPoint.getX(), closestPoint.getY());
+			for (int i = pathSegments.indexOf(closestSegment); i < pathSegments.size(); i++) {
+				points.clear();
+				Line2D segment = new Line2D.Double(closestPoint, pathSegments.get(i).getP2());
+				Point2D segmentEnd = segment.getP2();
+				double segmentLength = closestPoint.distance(segmentEnd);
+				
+				if (segmentLength < lookaheadDistance) {
+					// if it's not on this segment, need to check next segment
+					// adjust closest point and lookahead distance accordingly
+					lookaheadDistance -= segmentLength;
+					closestPoint = segmentEnd;
+					System.err.println("LOOKAHEAD ON SEGMENT AFTER " + i);
+					continue;
+				}
+				else if (LineSegment.radialPointsOnLineSegment(segment, lookaheadDistance, closestPoint, points)) {
+					lookaheadPoint = points.get(0);
+				}
+			}
+			return new RealPoint2D(lookaheadPoint.x, lookaheadPoint.y);
+		}
+
+		// setDesiredPose should be called before calling this method
+		public void taskRun() {
+			speech = new Speech();
+			robot.updateState();
+			double Kp = 2;
+			double Kd = 10;
+			double u = 0;
+
+			robotStartedHere = perceptor.getWorldPose();
+			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
+			//RealPose2D lastPoseRelStart = curPoseRelStart;
+			double curTime = System.currentTimeMillis();
+			double lastTime = curTime;
+			Point2D destPointRelStart = findLookaheadPoint();
+			double distanceErr;
+
+			double destR = (pow(destPointRelStart.getX(),2) +
+					pow(destPointRelStart.getY(),2))/(2*destPointRelStart.getY());
+			
+			double curv = 1.0/destR;
+			double destArcAngle;
+			double curArcAngle = 0;
+			double lastArcAngle;
+			if(destR >= 0)
+				destArcAngle = atan2(destPointRelStart.getX(), destR -
+						destPointRelStart.getY());
+			else
+				destArcAngle = atan2(destPointRelStart.getX(), -destR +
+						destPointRelStart.getY());
+
+			double dist = destR*destArcAngle;
+			distanceErr = dist;
+
+			//System.out.println("destR= "+destR+", dist= "+dist+", destArcAngle="+destArcAngle);
+
+			final double DISTANCE_TOLERANCE = 0.01;
+			double SPEED_TOLERANCE = 0.005;
+
+			while(!shouldStop() &&
+					(abs(distanceErr) > DISTANCE_TOLERANCE
+							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
+			{
+				robot.updateState();
+				//lastPoseRelStart = curPoseRelStart;
+				lastTime = curTime;
+				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
+				curTime = System.currentTimeMillis();
+				
+				// remove the old lookahead point
+				if (robot instanceof SimRobot) {
+					((SimRobot) robot).deleteObstacle(destPointRelStart.getX(), destPointRelStart.getY());
+				}
+				
+				// recalculate destination (code copied from before loop)
+				destPointRelStart = findLookaheadPoint();
+				
+				// draw the lookahead point
+				if (robot instanceof SimRobot) {
+					if (destPointRelStart.distance(perceptor.getWorldPose().getPosition()) > .25) {
+						((SimRobot) robot).addObstacle(destPointRelStart.getX(), destPointRelStart.getY(), 0.01);
+					}
+				}
+
+				destR = (pow(destPointRelStart.getX(),2) +
+						pow(destPointRelStart.getY(),2))/(2*destPointRelStart.getY());
+				
+				curv = 1.0/destR;
+				curArcAngle = 0;
+				if(destR >= 0)
+					destArcAngle = atan2(destPointRelStart.getX(), destR -
+							destPointRelStart.getY());
+				else
+					destArcAngle = atan2(destPointRelStart.getX(), -destR +
+							destPointRelStart.getY());
+
+				dist = destR*destArcAngle;
+				// finished recalculating destination
+
+				lastArcAngle = curArcAngle;
+				if(destR >= 0)
+					curArcAngle = atan2(curPoseRelStart.getX(), destR -
+							curPoseRelStart.getY());
+				else
+					curArcAngle = atan2(curPoseRelStart.getX(), -destR +
+							curPoseRelStart.getY());
+
+				distanceErr = destR*Angle.normalize(destArcAngle-curArcAngle);
+
+				//System.out.println("destR= "+destR+", distanceErr= "+distanceErr+", curArcAngle="+curArcAngle);
+
+				double distanceTraveled = destR*Angle.normalize(curArcAngle - lastArcAngle);
+				boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
+
+				double pterm = Kp*distanceErr;
+				double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
+				if (progressMade) {
+					dterm *= -1;
+				}
+				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
+				u = pterm;// + dterm;
+				double speed = u;
+				controller.setCurvVel(curv, speed);
+
+				try {
+					Thread.sleep(5);
+				} catch(InterruptedException iex) {
+					System.err.println("go-to sleep interrupted");
+				}
+			}
+			System.out.println("Current x = "+curPoseRelStart.getX());
+			System.out.println("Current y = "+curPoseRelStart.getY());
+
+			// TODO figure out what to do at the end of the path (turnto, etc)
+			/* XXX copied code from TurnToTask.
+			// Check whether the "rapid transition" rule is broken here.
+			System.out.println("FINISHED X/Y. STARTING THETA");
+			Kp = .4;
+			Kd = 95;
+			u = 0;
+			robot.updateState();
+			double curAngle = Angle.normalize(robot.getHeading());
+			double lastAngle = curAngle;
+			curTime = System.nanoTime();
+			lastTime = curTime;
+			curPoseRelStart = perceptor.getRelPose(robotStartedHere);
+			double desiredAngle = Angle.normalize(desiredPose.getTh() - curPoseRelStart.getTh());
+			double destAngle = Angle.normalize(curAngle + desiredAngle);
+			//System.out.println("destAngle: " + destAngle);
+			double angleErr = Angle.normalize(destAngle - curAngle);
+
+			final double ANGLE_TOLERANCE = 0.01;
+			SPEED_TOLERANCE = 0.01;
+
+			while(!shouldStop() &&
+					(abs(angleErr) > ANGLE_TOLERANCE
+							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
+			{
+				//System.out.println("angleErr = " + angleErr);
+				robot.updateState();
+				lastAngle = curAngle;
+				lastTime = curTime;
+				curAngle = Angle.normalize(robot.getHeading());
+				//curTime = System.nanoTime();
+				curTime = System.currentTimeMillis();
+				angleErr = Angle.normalize(destAngle - curAngle);
+
+				double angleTraveled = Angle.normalize(curAngle - lastAngle);
+				boolean progressMade = signum(angleTraveled) == signum(angleErr);
+
+				double pterm = Kp*abs(angleErr);
+				double dterm = Kd*(abs(angleTraveled))/(curTime-lastTime);
+				if (progressMade) {
+					dterm *= -1;
+				}
+				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
+				u = pterm + dterm;
+				double direction = signum(angleErr);
+				//System.err.println(angleErr + " off, speed = " + u*direction);
+				double speed = direction*u;
+				controller.setVel(-speed, speed);
+
+				try {
+					Thread.sleep(5);
+				} catch(InterruptedException iex) {
+					System.err.println("pose-to (turn) sleep interrupted");
+				}
+			}
+			//*/
+
+			speech.speak("remaining error " + AngleMath.roundTo2(distanceErr*1000)
+					+ " millimeters");
+			controller.stop();
+		}
+
+		public String toString() {
+			return "follow-path task: " + desiredPath;
+		}
+	}
+	
 	private static final long serialVersionUID = 0;
 }
