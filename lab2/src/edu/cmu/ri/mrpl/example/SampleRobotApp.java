@@ -647,8 +647,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				double pterm = Kp*distanceErr;
 				double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
 				if (progressMade) {
+					dterm *= -1;
 				}
-				dterm *= -1;
 				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
 				u = pterm + dterm;
 				double speed = u;
@@ -688,7 +688,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			desiredPose = new RealPose2D(x,y,th);
 		}
 
-		// setDesiredDistance should be called before calling this method
+		// setDesiredPose should be called before calling this method
 		public void taskRun() {
 			speech = new Speech();
 			robot.updateState();
@@ -699,16 +699,19 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			robotStartedHere = perceptor.getWorldPose();
 			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-			RealPose2D lastPoseRelStart = curPoseRelStart;
-			double curTime = System.nanoTime();
+			//RealPose2D lastPoseRelStart = curPoseRelStart;
+			double curTime = System.currentTimeMillis();
 			double lastTime = curTime;
 			final RealPose2D destPoseRelStart = desiredPose;
 			double distanceErr;
 
 			double destR = (pow(destPoseRelStart.getX(),2) +
-					pow(destPoseRelStart.getY(),2))/(destPoseRelStart.getY()/2);
+					pow(destPoseRelStart.getY(),2))/(2*destPoseRelStart.getY());
+			
 			double curv = 1.0/destR;
 			double destArcAngle;
+			double curArcAngle = 0;
+			double lastArcAngle;
 			if(destR >= 0)
 				destArcAngle = atan2(destPoseRelStart.getX(), destR -
 						destPoseRelStart.getY());
@@ -720,8 +723,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			distanceErr = dist;
 
 
-			System.out.println("destR= "+destR+", dist= "+dist
-					+", destArcAngle="+destArcAngle);
+			//System.out.println("destR= "+destR+", dist= "+dist+", destArcAngle="+destArcAngle);
 
 			final double DISTANCE_TOLERANCE = 0.01;
 			double SPEED_TOLERANCE = 0.01;
@@ -731,12 +733,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
 			{
 				robot.updateState();
-				lastPoseRelStart = curPoseRelStart;
+				//lastPoseRelStart = curPoseRelStart;
 				lastTime = curTime;
 				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
 				curTime = System.currentTimeMillis();
 
-				double curArcAngle;
+				lastArcAngle = curArcAngle;
 				if(destR >= 0)
 					curArcAngle = atan2(curPoseRelStart.getX(), destR -
 							curPoseRelStart.getY());
@@ -746,19 +748,18 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 				distanceErr = destR*(destArcAngle-curArcAngle);
 
-				System.out.println("destR= "+destR+", distanceErr= "+distanceErr
-						+", curArcAngle="+curArcAngle);
+				//System.out.println("destR= "+destR+", distanceErr= "+distanceErr+", curArcAngle="+curArcAngle);
 
-				double distanceTraveled = dist - distanceErr;
+				double distanceTraveled = destR*(curArcAngle - lastArcAngle);
 				boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
 
 				double pterm = Kp*distanceErr;
 				double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
 				if (progressMade) {
+					dterm *= -1;
 				}
-				dterm *= -1;
-				System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
-				u = pterm + dterm;
+				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
+				u = pterm;// + dterm;
 				double speed = u;
 				controller.setCurvVel(curv, speed);
 
@@ -768,6 +769,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					System.err.println("go-to sleep interrupted");
 				}
 			}
+			System.out.println("Current x = "+curPoseRelStart.getX());
+			System.out.println("Current y = "+curPoseRelStart.getY());
+			System.out.println("FINISHED X/Y. STARTING THETA");
 
 			// XXX copied code from TurnToTask.
 			// Check whether the "rapid transition" rule is broken here.
