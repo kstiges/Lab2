@@ -825,9 +825,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		
 		private final double LOOKAHEAD_DISTANCE = 0.25;
 		private Line2D closestSegment;
+		
+		private TaskController tc;
 
 		FollowPathTask(TaskController tc, ArrayList<RealPose2D> poses, double maxDeviation) {
 			super(tc);
+			this.tc = tc;
 			setDesiredPath(poses, maxDeviation);
 		}
 
@@ -897,8 +900,20 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 		// setDesiredPath should be called before calling this method
 		public void taskRun() {
-			speech = new Speech();
 			robot.updateState();
+			RealPose2D context = new RealPose2D();
+			for (int i = 0; i < desiredPath.size(); i++) {
+				RealPose2D nextPose = desiredPath.get(i);
+				RealPose2D transformed = RealPose2D.multiply(context, nextPose);
+				double x, y, th;
+				x = transformed.getX();
+				y = transformed.getY();
+				th = transformed.getTh();
+				upcomingTasks.add(i, new PoseToTask(tc, x, y, th));
+				context = nextPose.inverse();
+			}
+			/* XXX need to make this actually work
+			speech = new Speech();
 			double Kp = 2;
 			//double Kd = 10;
 			//double u = 0;
@@ -999,10 +1014,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					System.err.println("pose-to (turn) sleep interrupted");
 				}
 			}
-			//*/
+			
 
 			speech.speak("remaining error " + AngleMath.roundTo2(distanceErr*1000)
 					+ " millimeters");
+			//*/
 			controller.stop();
 		}
 
