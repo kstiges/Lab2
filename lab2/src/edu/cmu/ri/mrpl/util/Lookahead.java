@@ -109,6 +109,10 @@ public class Lookahead {
 				}
 			}
 		}
-		return -1;
+		// handles case where lookahead goes off the end of the path
+		if (retLookaheadPoint != null) {
+			retLookaheadPoint.setLocation(pathSegments.get(pathSegments.size()-1).getP2());
+		}
+		return pathSegments.size()-1;
 	}
 }
