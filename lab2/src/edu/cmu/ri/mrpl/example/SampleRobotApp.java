@@ -1,4 +1,5 @@
-// XXX TODO add in error correction
+// XXX TODO add in error correction, return-to-path functionality,
+// and end of followpath behavior
 
 package edu.cmu.ri.mrpl.example;
 /*
@@ -822,7 +823,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		Perceptor perceptor;
 		Speech speech;
 		
-		private final double LOOKAHEAD_DISTANCE = 0.25;
+		private final double LOOKAHEAD_DISTANCE = 0.5;
 		
 		private TaskController tc;
 
@@ -846,6 +847,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		// setDesiredPath should be called before calling this method
 		public void taskRun() {
 			robot.updateState();
+			/*
 			RealPose2D context = new RealPose2D();
 			for (int i = 0; i < desiredPath.size(); i++) {
 				RealPose2D nextPose = desiredPath.get(i);
@@ -857,7 +859,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				upcomingTasks.add(i, new PoseToTask(tc, x, y, th));
 				context = nextPose.inverse();
 			}
-			//* XXX need to make this actually work
+			/*/ //XXX need to make this actually work
 			speech = new Speech();
 			double Kp = 2;
 			//double Kd = 10;
@@ -866,10 +868,10 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			robotStartedHere = perceptor.getWorldPose();
 			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
 			RealPoint2D tmp = new RealPoint2D();
-			Lookahead.findLookaheadPoint(pathSegments, robotStartedHere.getPosition(), LOOKAHEAD_DISTANCE, tmp);
-			Point2D destPointRelStart = robotStartedHere.inverseTransform(tmp, null);
+			Lookahead.findLookaheadPoint(pathSegments, curPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
+			Point2D destPointRelCur = robotStartedHere.inverseTransform(tmp, null);
 
-			double[] arcInfo = calculateArc(destPointRelStart);
+			double[] arcInfo = calculateArc(destPointRelCur);
 			double distanceErr = arcInfo[1];
 
 			while(!shouldStop() &&
@@ -881,22 +883,21 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				
 				// remove the old lookahead point
 				if (robot instanceof SimRobot) {
-					((SimRobot) robot).deleteObstacle(destPointRelStart.getX(), destPointRelStart.getY());
+					((SimRobot) robot).deleteObstacle(tmp.getX(), tmp.getY());
 				}
 				
 				// recalculate destination (code copied from before loop)
-				RealPose2D robotRelWorld = perceptor.getWorldPose();
-				Lookahead.findLookaheadPoint(pathSegments, robotRelWorld.getPosition(), LOOKAHEAD_DISTANCE, tmp);
-				destPointRelStart = curPoseRelStart.inverseTransform(tmp, null);
+				Lookahead.findLookaheadPoint(pathSegments, curPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
+				destPointRelCur = curPoseRelStart.inverseTransform(tmp, null);
 				
 				// draw the lookahead point
 				if (robot instanceof SimRobot) {
-					if (destPointRelStart.distance(perceptor.getWorldPose().getPosition()) > .25) {
-						((SimRobot) robot).addObstacle(destPointRelStart.getX(), destPointRelStart.getY(), 0.01);
+					if (tmp.distance(perceptor.getWorldPose().getPosition()) > .25) {
+						((SimRobot) robot).addObstacle(tmp.getX(), tmp.getY(), 0.01);
 					}
 				}
 				
-				arcInfo = calculateArc(destPointRelStart);
+				arcInfo = calculateArc(destPointRelCur);
 				controller.setCurvVel(1.0/arcInfo[0], Kp*arcInfo[1]);
 
 				try {
