@@ -26,11 +26,10 @@ import javax.swing.*;
 import edu.cmu.ri.mrpl.*;
 import edu.cmu.ri.mrpl.Robot;
 import edu.cmu.ri.mrpl.kinematics2D.Angle;
-import edu.cmu.ri.mrpl.kinematics2D.LineSegment;
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
-import edu.cmu.ri.mrpl.kinematics2D.Vector2D;
 import edu.cmu.ri.mrpl.util.AngleMath;
+import edu.cmu.ri.mrpl.util.Lookahead;
 import static java.lang.Math.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
@@ -816,7 +815,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 	class FollowPathTask extends Task {
 		ArrayList<RealPose2D> desiredPath;
-		ArrayList<Line2D> pathSegments;
+		java.util.List<Line2D> pathSegments;
 		double maxDeviation;
 		RealPose2D robotStartedHere;
 		Controller controller;
@@ -824,7 +823,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		Speech speech;
 		
 		private final double LOOKAHEAD_DISTANCE = 0.25;
-		private Line2D closestSegment;
 		
 		private TaskController tc;
 
@@ -841,61 +839,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			this.maxDeviation = maxDeviation;
 			
 			// construct list of line segments
-			pathSegments = new ArrayList<Line2D>();
-			for (int i = 1; i < desiredPath.size(); i++) {
-				pathSegments.add(new Line2D.Double(desiredPath.get(i-1).getPosition(),
-						desiredPath.get(i).getPosition()));
-			}
+			pathSegments = Lookahead.posesToPath(poses);
 			System.err.println(desiredPath.size() + " PATH SEGMENTS");
-		}
-		
-		private RealPoint2D findClosestPoint () {
-			RealPoint2D closestPoint = new RealPoint2D();
-			double minDistSquared = Double.MAX_VALUE;
-			Point2D robotRelWorld = perceptor.getWorldPose().getPosition();
-			Line2D oldClosestSegment = closestSegment;
-			for (int i = 0; i < pathSegments.size(); i++) {
-				Line2D segment = pathSegments.get(i);
-				RealPoint2D tmp = new RealPoint2D();
-				double tmpDistSquared = LineSegment.closestPointOnLineSegment(segment, robotRelWorld, tmp);
-				if (tmpDistSquared <= minDistSquared) {
-					minDistSquared = tmpDistSquared;
-					closestPoint.setLocation(tmp);
-					closestSegment = segment;
-				}
-			}
-			if (oldClosestSegment != null && !closestSegment.equals(oldClosestSegment)) {
-				System.out.printf("CHANGING SEGMENTS FROM %d to %d\n",
-						pathSegments.indexOf(oldClosestSegment), pathSegments.indexOf(closestSegment));
-			}
-			return closestPoint;
-		}
-		
-		// TODO make this work properly. wtf
-		private Point2D findLookaheadPoint () {
-			Point2D closestPoint = findClosestPoint();
-			ArrayList<Vector2D> points = new ArrayList<Vector2D>();
-			double lookaheadDistance = LOOKAHEAD_DISTANCE;
-			Vector2D lookaheadPoint = new Vector2D(closestPoint.getX(), closestPoint.getY());
-			for (int i = pathSegments.indexOf(closestSegment); i < pathSegments.size(); i++) {
-				points.clear();
-				Line2D segment = new Line2D.Double(closestPoint, pathSegments.get(i).getP2());
-				Point2D segmentEnd = segment.getP2();
-				double segmentLength = closestPoint.distance(segmentEnd);
-				
-				if (segmentLength < lookaheadDistance) {
-					// if it's not on this segment, need to check next segment
-					// adjust closest point and lookahead distance accordingly
-					lookaheadDistance -= segmentLength;
-					closestPoint = segmentEnd;
-					System.err.println("LOOKAHEAD ON SEGMENT AFTER " + i);
-					continue;
-				}
-				else if (LineSegment.radialPointsOnLineSegment(segment, lookaheadDistance, closestPoint, points)) {
-					lookaheadPoint = points.get(0);
-				}
-			}
-			return new RealPoint2D(lookaheadPoint.x, lookaheadPoint.y);
 		}
 
 		// setDesiredPath should be called before calling this method
@@ -912,7 +857,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				upcomingTasks.add(i, new PoseToTask(tc, x, y, th));
 				context = nextPose.inverse();
 			}
-			/* XXX need to make this actually work
+			//* XXX need to make this actually work
 			speech = new Speech();
 			double Kp = 2;
 			//double Kd = 10;
@@ -920,7 +865,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			robotStartedHere = perceptor.getWorldPose();
 			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-			Point2D destPointRelStart = findLookaheadPoint();
+			RealPoint2D tmp = new RealPoint2D();
+			Lookahead.findLookaheadPoint(pathSegments, robotStartedHere.getPosition(), LOOKAHEAD_DISTANCE, tmp);
+			Point2D destPointRelStart = robotStartedHere.inverseTransform(tmp, null);
 
 			double[] arcInfo = calculateArc(destPointRelStart);
 			double distanceErr = arcInfo[1];
@@ -938,7 +885,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 				
 				// recalculate destination (code copied from before loop)
-				destPointRelStart = findLookaheadPoint();
+				RealPose2D robotRelWorld = perceptor.getWorldPose();
+				Lookahead.findLookaheadPoint(pathSegments, robotRelWorld.getPosition(), LOOKAHEAD_DISTANCE, tmp);
+				destPointRelStart = curPoseRelStart.inverseTransform(tmp, null);
 				
 				// draw the lookahead point
 				if (robot instanceof SimRobot) {
