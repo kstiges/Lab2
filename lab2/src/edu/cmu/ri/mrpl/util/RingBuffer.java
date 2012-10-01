@@ -23,4 +23,6 @@ public class RingBuffer<T> {
 	public int getCapacity () {
 		return capacity;
 	}
+	
+	// TODO write iterator that skips nulls?
 }
