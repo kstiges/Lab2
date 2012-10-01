@@ -34,6 +34,7 @@ import edu.cmu.ri.mrpl.maze.MazeGraphics;
 import edu.cmu.ri.mrpl.maze.MazeGraphics.ContRobot;
 import edu.cmu.ri.mrpl.maze.MazeLocalizer;
 import edu.cmu.ri.mrpl.maze.MazeRobot;
+import edu.cmu.ri.mrpl.maze.MazeState;
 import edu.cmu.ri.mrpl.maze.MazeViewer;
 import edu.cmu.ri.mrpl.maze.MazeWorld;
 import edu.cmu.ri.mrpl.util.AngleMath;
@@ -1006,7 +1007,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	class DrawMazeTask extends Task {
 
 		Perceptor perceptor;
-		MazeLocalizer mazeLocalizer;
+		MazeLocalizer correctedLocalizer;
+		MazeLocalizer rawLocalizer;
 		MazeWorld mazeWorld;
 		MazeGraphics mazeGraphics;
 		MazeRobot mazeRobot;
@@ -1016,32 +1018,46 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			super(tc);
 			mazeWorld = new MazeWorld(fileName);
 			mazeGraphics = new MazeGraphics(mazeWorld);
-			mazeLocalizer = new MazeLocalizer(mazeWorld);
+			
+			// construct corrected localizer
+			correctedLocalizer = new MazeLocalizer(mazeWorld);
+			// construct uncorrected localizer
+			// save init
+			MazeState init = mazeWorld.getInits().iterator().next(); 
+			mazeWorld.removeAllInits();
+			mazeWorld.addInit(new MazeState(0, 0, MazeWorld.Direction.East));
+			rawLocalizer = new MazeLocalizer(mazeWorld);
+			// replace original init
+			mazeWorld.removeAllInits();
+			mazeWorld.addInit(init);
+			
 			perceptor = new Perceptor(robot);
 			wrapper = new JFrame();
 			wrapper.add(mazeGraphics);
+			wrapper.setSize(400, 400);
 			wrapper.setVisible(true);
 		}
 
 		public void taskRun() {
 			java.util.List<ContRobot> list = Collections.synchronizedList(new ArrayList<ContRobot>()); 
-			RealPose2D curPosition = mazeLocalizer.fromInitToCell(perceptor.getWorldPose());
-			RealPose2D lastPosition = curPosition;
-			list.add(new ContRobot(curPosition, Color.RED));
-			list.add(new ContRobot(lastPosition, Color.BLUE));
+			RealPose2D correctedPosition = correctedLocalizer.fromInitToCell(perceptor.getWorldPose());
+			RealPose2D rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
+			list.add(new ContRobot(rawPosition, Color.RED));
+			list.add(new ContRobot(correctedPosition, Color.GREEN));
 			mazeGraphics.setContRobots(list);
 
 			while(!shouldStop()) {
 				robot.updateState();
-				lastPosition = curPosition;
-				curPosition = mazeLocalizer.fromInitToCell(perceptor.getWorldPose());
+				correctedPosition = correctedLocalizer.fromInitToCell(perceptor.getWorldPose());
+				rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
 				synchronized(list) {
-					list.get(0).pose.setPose(curPosition.getX(), curPosition.getY(), curPosition.getTh()*PI/2);
-					list.get(1).pose.setPose(lastPosition.getX(), lastPosition.getY(), lastPosition.getTh()*PI/2);
+					list.get(0).pose.setPose(rawPosition.getX(), rawPosition.getY(), rawPosition.getTh()*PI/2);
+					list.get(1).pose.setPose(correctedPosition.getX(), correctedPosition.getY(), correctedPosition.getTh()*PI/2);
 				}
-				remainingField.setText(curPosition.toString());
+				remainingField.setText(String.format("%.2f %.2f %.2f",
+						correctedPosition.getX(), correctedPosition.getY(), correctedPosition.getTh()));
 				mazeGraphics.setContRobots(list);
-				mazeGraphics.paint(wrapper.getGraphics());
+				mazeGraphics.repaint();
 				try {
 					Thread.sleep(50);
 				} catch(InterruptedException iex) {
