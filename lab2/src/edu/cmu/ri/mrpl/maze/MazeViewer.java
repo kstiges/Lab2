@@ -120,6 +120,8 @@ public class MazeViewer extends JFrame {
 			try {
 				loadMaze(file);
 			} catch(IOException ioex) {
+				System.err.println("here");
+
 				statusField.setText("maze loading failed!");
 				JOptionPane.showMessageDialog(this, "Error loading "+file+": "+ioex, "Error loading file", JOptionPane.ERROR_MESSAGE);
 			}
