@@ -1010,6 +1010,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		MazeWorld mazeWorld;
 		MazeGraphics mazeGraphics;
 		MazeRobot mazeRobot;
+		JFrame wrapper;
 
 		DrawMazeTask(TaskController tc, String fileName) throws IOException {
 			super(tc);
@@ -1017,7 +1018,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			mazeGraphics = new MazeGraphics(mazeWorld);
 			mazeLocalizer = new MazeLocalizer(mazeWorld);
 			perceptor = new Perceptor(robot);
-			JFrame wrapper = new JFrame();
+			wrapper = new JFrame();
 			wrapper.add(mazeGraphics);
 			wrapper.setVisible(true);
 		}
@@ -1040,6 +1041,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 				remainingField.setText(curPosition.toString());
 				mazeGraphics.setContRobots(list);
+				mazeGraphics.paint(wrapper.getGraphics());
 				try {
 					Thread.sleep(50);
 				} catch(InterruptedException iex) {

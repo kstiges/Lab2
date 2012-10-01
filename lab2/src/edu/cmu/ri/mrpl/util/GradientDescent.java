@@ -12,7 +12,8 @@ public class GradientDescent {
 	private static final double dx = 0.01;
 	private static final double dy = 0.01;
 	private static final double dtheta = 0.01;
-	private static final double ERROR_THRESHOLD = 0.25;
+	// TODO adjust this?
+	private static final double ERROR_THRESHOLD = 0.1;
 
 	public interface ErrorFunction {
 		public double getError (double[] args);
@@ -74,6 +75,7 @@ public class GradientDescent {
 	}
 
 	public static void main (String... args) {
+		// simple test
 		ErrorFunction parabola = new ErrorFunction(){
 			public double getError (double[] pose) {
 				return abs(pose[0]-5) + abs(pose[1]-2) + abs(pose[2]-1.57);
@@ -82,19 +84,38 @@ public class GradientDescent {
 
 		// make a 3x3 grid of points that are one wall length apart
 		RingBuffer<RealPoint2D> points = new RingBuffer<RealPoint2D>(10);
-		for (int row = 0; row < 3; row++) {
-			for (int col = 0; col < 3; col++) {
-				points.add(new RealPoint2D(col*WALL_METERS, row*WALL_METERS));
-			}
+		for (int i = 0; i < 10; i++) {
+			points.add(new RealPoint2D(i*0.1, 0));
 		}
 		ErrorFunction fitter = new WallPointFitter(points);
 
-		double[] coords = new double[]{.5, .5, 1};
-		descend(fitter, coords);
+		ErrorFunction ghettoFitter = new ErrorFunction() {
+			public double getError (double[] coords) {
+				RealPose2D pose = new RealPose2D(coords[0], coords[1], coords[2]);
+				double err = 0;
+				//System.err.println(pose);
+				for (int i = 0; i < 10; i++) {
+					RealPoint2D onXaxis = new RealPoint2D(i*.1, 0);
+					Point2D transformed = pose.inverseTransform(onXaxis, null);
+					//System.err.println(transformed);
+					err += abs(transformed.getY());
+				}
+				//System.err.println(err);
+				return err;
+			}
+		};
+		
+		ErrorFunction useMe = fitter;
+		
+		double[] coords = new double[]{0, 0, .1};
+		
+		descend(useMe, coords);
+		
 		for (double d : coords) {
 			System.out.println(d);
 		}
-		System.out.println("Error = " + fitter.getError(coords));
+		
+		System.out.println("error: " + useMe.getError(coords));
 	}
 
 	public static class WallPointFitter implements ErrorFunction {
@@ -106,9 +127,10 @@ public class GradientDescent {
 
 		public double getError (double[] args) {
 			RealPose2D pose = new RealPose2D(args[0], args[1], args[2]);
-			//System.err.println("getError: pose = " + pose);
+			System.err.println("getError: pose = " + pose);
 			double error = 0;
 
+			int count = 0;
 			for (int i = 0; i < points.getCapacity(); i++) {
 				RealPoint2D point = points.get(i);
 
@@ -116,6 +138,7 @@ public class GradientDescent {
 				if (point == null) {
 					continue;
 				}
+				count++;
 
 				// transform to frame of specified pose
 				Point2D transformed = pose.inverseTransform(point, null);
@@ -131,13 +154,15 @@ public class GradientDescent {
 				// use distance squared to avoid negatives
 				double wallErr = pow(wallDist, 2);
 
-				System.err.printf("fit point #%d (%.2f,%.2f) to wall (%.2f, %.2f) %.2f m away\n", i, x, y, xWall, yWall, wallDist);
+				//System.err.printf("fit point #%d (%.2f,%.2f) to wall (%.2f, %.2f) %.2f m away\n", i, x, y, xWall, yWall, wallDist);
 
 				// accumulate distances into error
 				error += wallErr;
 			}
 
-			return error;
+			// TODO this returns the standard deviation (as in slide 42 of lecture 5)
+			// is this right?
+			return sqrt(error/count);
 		}
 	}
 }
