@@ -13,6 +13,9 @@ import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
 import edu.cmu.ri.mrpl.kinematics2D.Vector2D;
 
 public class Lookahead {
+	
+	static int currentSegment = 0;
+	
 	public static void main (String... args) {
 		// make a unit square
 		List<Line2D> pathSegments = new LinkedList<Line2D>();
@@ -60,6 +63,13 @@ public class Lookahead {
 				minDistSquared = tmpDistSquared;
 				closestPoint.setLocation(tmp);
 				closestSegmentIndex = i;
+				if (i != currentSegment) {
+					currentSegment = i;
+					if (retClosestPoint != null) {
+						retClosestPoint.setLocation(closestPoint);
+					}
+					return closestSegmentIndex;
+				}
 			}
 		}
 		/*
@@ -71,6 +81,7 @@ public class Lookahead {
 		if (retClosestPoint != null) {
 			retClosestPoint.setLocation(closestPoint);
 		}
+		
 		return closestSegmentIndex;
 	}
 	
