@@ -69,7 +69,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	private java.util.LinkedList<Task> upcomingTasks;
 
 	static final int DEFAULT_ROOM_SIZE = 4;
-	
+
 	final double DISTANCE_TOLERANCE = 0.01;
 	final double ANGLE_TOLERANCE = 0.01;
 	final double SPEED_TOLERANCE = 0.01;
@@ -162,7 +162,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		box.add(executeButton);
 		box.add(Box.createHorizontalStrut(30));
 		box.add(loadMazeButton);
-		
+
 		main.add(Box.createVerticalStrut(30));
 
 		box = Box.createHorizontalBox();
@@ -354,7 +354,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			} catch (IOException e1) {
 				System.err.println("Couldn't read maze file");
 			}
-			
+
 			startUpcomingTasks();
 		}
 	}
@@ -377,7 +377,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 		executeActionList(commandSequence);
 	}
-	
+
 	public synchronized boolean canStart(Task t) {
 		if (curTask!=null)
 			return false;
@@ -426,7 +426,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				upcomingTasks.add(new WaitTask(this,
 						((Command.LengthArgument) cmd.argument).d));
 				break;
-				
+
 			case POSETO:
 				RealPose2D pose = ((Command.PoseArgument) cmd.argument).pose;
 				upcomingTasks.add(new PoseToTask(this,
@@ -434,7 +434,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						pose.getY(),
 						pose.getTh()));
 				break;
-				
+
 			case FOLLOWPATH:
 				Path path = ((Command.PathArgument) cmd.argument).path;
 				upcomingTasks.add(new FollowPathTask(this, path, 0.1));
@@ -712,7 +712,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			return "go-to task: " + desiredDistance;
 		}
 	}
-	
+
 	private static double calculateArcLength (Point2D dest, double radius) {
 		double x = dest.getX();
 		double y = dest.getY();
@@ -744,7 +744,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		return new double[]{radius, arcLength};
 	}
-	
+
 	class PoseToTask extends Task {
 		RealPose2D destPoseRelStart;
 		Controller controller;
@@ -768,22 +768,22 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		public void taskRun() {
 			speech = new Speech();
 			robot.updateState();
-			
+
 			final double Kp = 2;
 			final double Kd = 10;
 
 			RealPose2D robotStartedHere = perceptor.getWorldPose();
 			RealPose2D curPoseRelStart = new RealPose2D();
-            RealPose2D lastPoseRelStart;
-            double curTime = System.nanoTime();
-            double lastTime;
-            
+			RealPose2D lastPoseRelStart;
+			double curTime = System.nanoTime();
+			double lastTime;
+
 			// calculate arc info
-            double[] arcInfo = calculateArc(destPoseRelStart.getPosition());
+			double[] arcInfo = calculateArc(destPoseRelStart.getPosition());
 			double radius = arcInfo[0];
 			double distanceErr = arcInfo[1];
 			System.err.printf("arc: radius=%.2f, distanceErr=%.2f\n", radius, distanceErr);
-			
+
 			do {
 				// update everything
 				lastPoseRelStart = curPoseRelStart;
@@ -791,24 +791,24 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				robot.updateState();
 				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
 				curTime = System.currentTimeMillis();
-				
+
 				// figure out how far we've been
 				RealPose2D curPoseRelLast = RealPose2D.multiply(
 						lastPoseRelStart.inverse(), curPoseRelStart);
 				double distanceTraveled = calculateArcLength(curPoseRelLast.getPosition(), radius);
-				
+
 				// compute whether progress has been made
 				RealPose2D destPoseRelCur = RealPose2D.multiply(
 						curPoseRelStart.inverse(), destPoseRelStart);
 				distanceErr = calculateArcLength(destPoseRelCur.getPosition(), radius);
-		        boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
+				boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
 
 				// calculate dterm
-		        double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
-		        if (progressMade) {
-		        	dterm *= -1;
-		        }
-		        
+				double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
+				if (progressMade) {
+					dterm *= -1;
+				}
+
 				// set wheel speeds
 				double pterm = Kp*distanceErr;
 				double speed = pterm;// + dterm;
@@ -829,7 +829,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			speech.speak("remaining error " + AngleMath.roundTo2(distanceErr*1000)
 					+ " millimeters");
-			
+
 			upcomingTasks.add(0, new TurnToTask(tc, Angle.normalize(
 					destPoseRelStart.getTh() + robotStartedHere.getTh() - robot.getHeading())));
 			controller.stop();
@@ -848,9 +848,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		Controller controller;
 		Perceptor perceptor;
 		Speech speech;
-		
+
 		private final double LOOKAHEAD_DISTANCE = 0.5;
-		
+
 		private TaskController tc;
 
 		FollowPathTask(TaskController tc, ArrayList<RealPose2D> poses, double maxDeviation) {
@@ -864,7 +864,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			perceptor = new Perceptor(robot);
 			desiredPath = new ArrayList<RealPose2D>(poses);
 			this.maxDeviation = maxDeviation;
-			
+
 			// construct list of line segments
 			pathSegments = Lookahead.posesToPath(poses);
 			System.err.println(desiredPath.size() + " PATH SEGMENTS");
@@ -906,23 +906,23 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			{
 				robot.updateState();
 				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-				
+
 				// remove the old lookahead point
 				if (robot instanceof SimRobot) {
 					((SimRobot) robot).deleteObstacle(tmp.getX(), tmp.getY());
 				}
-				
+
 				// recalculate destination (code copied from before loop)
 				Lookahead.findLookaheadPoint(pathSegments, curPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
 				destPointRelCur = curPoseRelStart.inverseTransform(tmp, null);
-				
+
 				// draw the lookahead point
 				if (robot instanceof SimRobot) {
 					if (tmp.distance(perceptor.getWorldPose().getPosition()) > .25) {
 						((SimRobot) robot).addObstacle(tmp.getX(), tmp.getY(), 0.01);
 					}
 				}
-				
+
 				arcInfo = calculateArc(destPointRelCur);
 				controller.setCurvVel(1.0/arcInfo[0], Kp*arcInfo[1]);
 
@@ -990,7 +990,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					System.err.println("pose-to (turn) sleep interrupted");
 				}
 			}
-			
+
 
 			speech.speak("remaining error " + AngleMath.roundTo2(distanceErr*1000)
 					+ " millimeters");
@@ -1002,7 +1002,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			return "follow-path task: " + desiredPath;
 		}
 	}
-	
+
 	class DrawMazeTask extends Task {
 
 		Perceptor perceptor;
@@ -1010,36 +1010,40 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		MazeWorld mazeWorld;
 		MazeGraphics mazeGraphics;
 		MazeRobot mazeRobot;
-		
+		JFrame wrapper;
+
 		DrawMazeTask(TaskController tc, String fileName) throws IOException {
 			super(tc);
 			mazeWorld = new MazeWorld(fileName);
 			mazeGraphics = new MazeGraphics(mazeWorld);
 			mazeLocalizer = new MazeLocalizer(mazeWorld);
 			perceptor = new Perceptor(robot);
-			JFrame wrapper = new JFrame();
+			wrapper = new JFrame();
 			wrapper.add(mazeGraphics);
 			wrapper.setVisible(true);
+			Dimension d = new Dimension(700, 500);
+			wrapper.setSize(d);
 		}
 
 		public void taskRun() {
 			java.util.List<ContRobot> list = Collections.synchronizedList(new ArrayList<ContRobot>()); 
-			RealPose2D curPosition = mazeLocalizer.fromInitToCell(perceptor.getWorldPose());
-			RealPose2D lastPosition = curPosition;
-			list.add(new ContRobot(curPosition, Color.RED));
-			list.add(new ContRobot(lastPosition, Color.BLUE));
+			RealPose2D mazePosition = mazeLocalizer.fromInitToCell(perceptor.getWorldPose());
+			RealPose2D wrongPosition = perceptor.getWorldPose();
+			list.add(new ContRobot(wrongPosition, Color.RED));
+			list.add(new ContRobot(mazePosition, Color.GREEN));
 			mazeGraphics.setContRobots(list);
-			
+
 			while(!shouldStop()) {
 				robot.updateState();
-				lastPosition = curPosition;
-				curPosition = mazeLocalizer.fromInitToCell(perceptor.getWorldPose());
+				wrongPosition = perceptor.getWorldPose();
+				mazePosition = mazeLocalizer.fromInitToCell(perceptor.getWorldPose());
 				synchronized(list) {
-					list.get(0).pose.setPose(curPosition.getX(), curPosition.getY(), curPosition.getTh()*PI/2);
-					list.get(1).pose.setPose(lastPosition.getX(), lastPosition.getY(), lastPosition.getTh()*PI/2);
+					list.get(0).pose.setPose(wrongPosition.getX(), wrongPosition.getY(), wrongPosition.getTh()*PI/2);
+					list.get(1).pose.setPose(mazePosition.getX(), mazePosition.getY(), mazePosition.getTh()*PI/2);
 				}
-				remainingField.setText(curPosition.toString());
+				remainingField.setText(mazePosition.toString());
 				mazeGraphics.setContRobots(list);
+				mazeGraphics.paint(wrapper.getGraphics());
 				try {
 					Thread.sleep(50);
 				} catch(InterruptedException iex) {
@@ -1054,6 +1058,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			return "draw maze task";
 		}
 	}
-	
+
 	private static final long serialVersionUID = 0;
 }
