@@ -1,5 +1,6 @@
 package edu.cmu.ri.mrpl.maze;
 
+import java.awt.geom.Point2D;
 import java.util.Scanner;
 
 import edu.cmu.ri.mrpl.kinematics2D.Angle;
@@ -30,6 +31,10 @@ public class MazeLocalizer {
 	// compute the pose of the robot in the maze world
 	public RealPose2D fromInitToWorld (RealPose2D robotRelInit) {
 		return RealPose2D.multiply(initRelWorld, robotRelInit);
+	}
+	
+	public Point2D transformInitToWorld (Point2D pointRelInit) {
+		return initRelWorld.transform(pointRelInit, null);
 	}
 	
 	// converts a pose in the maze world to cell coordinates
