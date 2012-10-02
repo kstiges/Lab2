@@ -1005,7 +1005,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		MazeRobot mazeRobot;
 		JFrame wrapper;
 		
-		private static final boolean USE_SONARS = true;
+		private static final boolean USE_SONARS = false;
 
 		DrawMazeTask(TaskController tc, String fileName) throws IOException {
 			super(tc);
@@ -1014,10 +1014,22 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			// construct corrected localizer
 			correctedLocalizer = new MazeLocalizer(mazeWorld, false);
-			// construct uncorrected localizer
-			rawLocalizer = new MazeLocalizer(mazeWorld, true);
 			// save init
 			MazeState init = mazeWorld.getInits().iterator().next();
+			
+			if (!USE_SONARS) {
+				mazeWorld.removeAllInits();
+				mazeWorld.addInit(new MazeState(0, 0, MazeWorld.Direction.East));
+			}
+			
+			// construct uncorrected localizer
+			rawLocalizer = new MazeLocalizer(mazeWorld, true);
+		
+			if (!USE_SONARS) {
+				// replace original init
+				mazeWorld.removeAllInits();
+				mazeWorld.addInit(init);
+			}
 			
 			if (USE_SONARS) {
 				robot.turnSonarsOn();
@@ -1068,7 +1080,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					sonarPointsBuffer = perceptor.getSonarObstacles();
 					for (int i=0; i<sonarPointsBuffer.length; i++) {
 						// only use the sonar readings that are within a certain distance
-						if (directSonarReadings[i] < MazeLocalizer.WALL_METERS ) {
+						if (directSonarReadings[i] < 2.0 ) {
 							pointsBuffer.add(correctedLocalizer.transformInitToWorld(perceptor.getCorrectedPose().transform(sonarPointsBuffer[i], null)));
 						}
 					}
