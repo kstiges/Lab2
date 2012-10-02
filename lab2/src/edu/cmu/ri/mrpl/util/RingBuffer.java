@@ -23,4 +23,12 @@ public class RingBuffer<T> {
 	public int getCapacity () {
 		return capacity;
 	}
+	
+	public void clear () {
+		for (int i = 0; i < capacity; i++) {
+			array[i] = null;
+		}
+	}
+	
+	// TODO write iterator that skips nulls?
 }

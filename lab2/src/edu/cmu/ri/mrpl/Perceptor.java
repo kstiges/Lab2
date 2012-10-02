@@ -14,9 +14,22 @@ public class Perceptor {
 	public static final double SONAR_RADIANS = 2 * Math.PI / NUM_SONARS;
 	public static final double SONAR_WIDTH = Math.toRadians(25);
 	public static final double PADDING = 1*ROBOT_RADIUS;
+	
+	private RealPose2D correctedPose = new RealPose2D();
+	private RealPose2D odometryPoseAtCorrection = new RealPose2D();
 
 	public Perceptor(Robot robot) {
 		this.robot = robot;
+	}
+	
+	public void setCorrectedPose (RealPose2D corrected) {
+		correctedPose = corrected;
+		odometryPoseAtCorrection = getWorldPose();
+	}
+	
+	public RealPose2D getCorrectedPose () {
+		RealPose2D odomOldToNew = RealPose2D.multiply(odometryPoseAtCorrection.inverse(), getWorldPose());
+		return RealPose2D.multiply(correctedPose, odomOldToNew);
 	}
 	
 	// returns the pose of the robot in the world frame
