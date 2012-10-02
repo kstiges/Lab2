@@ -80,7 +80,7 @@ public class GradientDescent {
 		};
 
 		// make a 3x3 grid of points that are one wall length apart
-		RingBuffer<RealPoint2D> points = new RingBuffer<RealPoint2D>(10);
+		RingBuffer<Point2D> points = new RingBuffer<Point2D>(10);
 		
 		double sqrtDist = CELL_RADIUS*(sqrt(2)-1.5)*sqrt(2)/2;
 		double[] wall = new double[]{sqrtDist,sqrtDist,-(sqrt(2)-1)*CELL_RADIUS,CELL_RADIUS};
@@ -119,11 +119,11 @@ public class GradientDescent {
 	}
 
 	public static class WallPointFitter implements ErrorFunction {
-		private RingBuffer<RealPoint2D> points;
+		private RingBuffer<Point2D> points;
 		private RealPose2D curPose;
 
-		public WallPointFitter (RingBuffer<RealPoint2D> points, RealPose2D curPose) {
-			this.points = points;
+		public WallPointFitter (RingBuffer<Point2D> pointsBuffer, RealPose2D curPose) {
+			this.points = pointsBuffer;
 			this.curPose = curPose;
 		}
 
@@ -134,7 +134,7 @@ public class GradientDescent {
 
 			int count = 0;
 			for (int i = 0; i < points.getCapacity(); i++) {
-				RealPoint2D point = points.get(i);
+				Point2D point = points.get(i);
 
 				// skip gaps in the point buffer
 				if (point == null) {

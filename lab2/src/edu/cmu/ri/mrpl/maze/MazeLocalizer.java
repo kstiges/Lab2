@@ -19,6 +19,7 @@ public class MazeLocalizer {
 	public MazeLocalizer (MazeWorld maze) {
 		initRelWorld = 
 			mazeStateToWorldPose(maze.getInits().iterator().next());
+			//new RealPose2D();
 	}
 	
 	// given the pose of the robot relative to its origin,
@@ -42,9 +43,9 @@ public class MazeLocalizer {
 		double x = (worldPose.getX() - CELL_RADIUS) / WALL_METERS;
 		double y = (worldPose.getY() - CELL_RADIUS) / WALL_METERS;
 		double theta = Angle.normalize(worldPose.getTh());
-		if (theta < 0) {
+		/*if (theta < 0) {
 			theta += 2*PI;
-		}
+		}*/
 		theta /= PI/2;
 		return new RealPose2D(x, y, theta);
 	}
@@ -58,6 +59,7 @@ public class MazeLocalizer {
 		return new RealPose2D(x, y, theta);
 	}
 	
+	/*
 	public static void main (String... args) {
 		MazeWorld world = new MazeWorld(5, 3);
 		world.addInit(2, 1, Direction.North);
@@ -78,4 +80,5 @@ public class MazeLocalizer {
 				local.fromInitToCell(new RealPose2D(x, y, theta)));
 		}
 	}
+	*/
 }
