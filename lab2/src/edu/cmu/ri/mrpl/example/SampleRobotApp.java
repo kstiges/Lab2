@@ -1015,14 +1015,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			// construct corrected localizer
 			correctedLocalizer = new MazeLocalizer(mazeWorld, false);
 			// construct uncorrected localizer
-			// save init
-			MazeState init = mazeWorld.getInits().iterator().next(); 
-			mazeWorld.removeAllInits();
-			mazeWorld.addInit(new MazeState(0, 0, MazeWorld.Direction.East));
 			rawLocalizer = new MazeLocalizer(mazeWorld, true);
-			// replace original init
-			mazeWorld.removeAllInits();
-			mazeWorld.addInit(init);
+			// save init
+			MazeState init = mazeWorld.getInits().iterator().next();
 			
 			if (USE_SONARS) {
 				robot.turnSonarsOn();
@@ -1058,8 +1053,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			RealPose2D curPose = perceptor.getCorrectedPose();
 			RealPose2D lastPollPosition = perceptor.getCorrectedPose();
 			RealPose2D lastGradientPosition = perceptor.getCorrectedPose();
-			double pollInterval = .01; // meters between polling the sonars
-			double gradientInterval = .25; // meters between running gradient descent on points
+			double pollInterval = 0.01; // meters between polling the sonars
+			double gradientInterval = 0.1; // meters between running gradient descent on points
 						
 			while(!shouldStop()) {
 				robot.updateState();
