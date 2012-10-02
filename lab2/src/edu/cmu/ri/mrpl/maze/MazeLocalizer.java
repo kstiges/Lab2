@@ -16,10 +16,10 @@ public class MazeLocalizer {
 	
 	private RealPose2D initRelWorld;
 	
-	public MazeLocalizer (MazeWorld maze) {
-		initRelWorld = 
-			mazeStateToWorldPose(maze.getInits().iterator().next());
-			//new RealPose2D();
+	public MazeLocalizer (MazeWorld maze, boolean isWrong) {
+		initRelWorld = isWrong
+			? mazeStateToWorldPose(maze.getInits().iterator().next())
+			: new RealPose2D();
 	}
 	
 	// given the pose of the robot relative to its origin,

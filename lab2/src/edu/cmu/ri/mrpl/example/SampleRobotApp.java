@@ -1004,6 +1004,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		MazeGraphics mazeGraphics;
 		MazeRobot mazeRobot;
 		JFrame wrapper;
+		
+		private static final boolean USE_SONARS = true;
 
 		DrawMazeTask(TaskController tc, String fileName) throws IOException {
 			super(tc);
@@ -1011,44 +1013,100 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			mazeGraphics = new MazeGraphics(mazeWorld);
 			
 			// construct corrected localizer
-			correctedLocalizer = new MazeLocalizer(mazeWorld);
+			correctedLocalizer = new MazeLocalizer(mazeWorld, false);
 			// construct uncorrected localizer
 			// save init
 			MazeState init = mazeWorld.getInits().iterator().next(); 
 			mazeWorld.removeAllInits();
 			mazeWorld.addInit(new MazeState(0, 0, MazeWorld.Direction.East));
-			rawLocalizer = new MazeLocalizer(mazeWorld);
+			rawLocalizer = new MazeLocalizer(mazeWorld, true);
 			// replace original init
 			mazeWorld.removeAllInits();
 			mazeWorld.addInit(init);
 			
+			if (USE_SONARS) {
+				robot.turnSonarsOn();
+			}
+			
 			perceptor = new Perceptor(robot);
+			perceptor.setCorrectedPose(MazeLocalizer.mazeStateToWorldPose(init));
 			wrapper = new JFrame();
 			wrapper.add(mazeGraphics);
+			wrapper.setSize(400, 400);
 			wrapper.setVisible(true);
-			Dimension d = new Dimension(700, 500);
-			wrapper.setSize(d);
 		}
 
 		public void taskRun() {
+			RingBuffer<Point2D> pointsBuffer;
+			RealPoint2D[] sonarPointsBuffer;
+			double[] directSonarReadings;
+			
+			if (USE_SONARS) {
+				pointsBuffer = new RingBuffer<Point2D>(400);
+				sonarPointsBuffer = null;
+				directSonarReadings = new double[16];
+			}
+			
 			java.util.List<ContRobot> list = Collections.synchronizedList(new ArrayList<ContRobot>()); 
-			RealPose2D mazePosition = correctedLocalizer.fromInitToCell(perceptor.getWorldPose());
-			RealPose2D wrongPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
-			list.add(new ContRobot(wrongPosition, Color.RED));
-			list.add(new ContRobot(mazePosition, Color.GREEN));
+			RealPose2D correctedPosition = correctedLocalizer.fromInitToCell(perceptor.getCorrectedPose());
+			RealPose2D rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
+			list.add(new ContRobot(rawPosition, Color.RED));
+			list.add(new ContRobot(correctedPosition, Color.GREEN));
+			
 			mazeGraphics.setContRobots(list);
-
+			
+			RealPose2D curPose = perceptor.getCorrectedPose();
+			RealPose2D lastPollPosition = perceptor.getCorrectedPose();
+			RealPose2D lastGradientPosition = perceptor.getCorrectedPose();
+			double pollInterval = .01; // meters between polling the sonars
+			double gradientInterval = .25; // meters between running gradient descent on points
+						
 			while(!shouldStop()) {
 				robot.updateState();
-				wrongPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
-				mazePosition = correctedLocalizer.fromInitToCell(perceptor.getWorldPose());
 				
-				synchronized(list) {
-					list.get(0).pose.setPose(wrongPosition.getX(), wrongPosition.getY(), Angle.normalize(wrongPosition.getTh()*PI/2));
-					list.get(1).pose.setPose(mazePosition.getX(), mazePosition.getY(), Angle.normalize(mazePosition.getTh()*PI/2));
+				curPose = perceptor.getCorrectedPose();
+					
+				if (USE_SONARS && curPose.getPosition().distance(lastPollPosition.getPosition())  > pollInterval) {
+					lastPollPosition = curPose;
+					
+					robot.getSonars(directSonarReadings);
+					sonarPointsBuffer = perceptor.getSonarObstacles();
+					for (int i=0; i<sonarPointsBuffer.length; i++) {
+						// only use the sonar readings that are within a certain distance
+						if (directSonarReadings[i] < MazeLocalizer.WALL_METERS ) {
+							pointsBuffer.add(correctedLocalizer.transformInitToWorld(perceptor.getCorrectedPose().transform(sonarPointsBuffer[i], null)));
+						}
+					}
 				}
 				
-				remainingField.setText(String.format("(%.2f, %.2f, %.2f)", mazePosition.getX(), mazePosition.getY(), (mazePosition.getTh()+4)%4));
+				// Every interval (.25 meters) do this
+				// Run gradient descent and correct the position of the robot in the maze based on the sonars and the walls
+				if (USE_SONARS && curPose.getPosition().distance(lastGradientPosition.getPosition()) > gradientInterval) {
+					
+					ErrorFunction fitter = new GradientDescent.WallPointFitter(pointsBuffer, curPose);
+					double[] coords = new double[]{curPose.getX(), curPose.getY(), curPose.getTh()};
+					GradientDescent.descend(fitter, coords);
+					
+					curPose.setPose(coords[0], coords[1], coords[2]);
+					lastGradientPosition = curPose;
+					lastPollPosition = curPose;
+					
+					perceptor.setCorrectedPose(curPose);
+					
+					// Clear the points buffer
+					pointsBuffer.clear();
+				}
+				
+				correctedPosition = correctedLocalizer.fromInitToCell(perceptor.getCorrectedPose());
+				rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
+				
+				synchronized(list) {
+					list.get(0).pose.setPose(rawPosition.getX(), rawPosition.getY(), rawPosition.getTh()*PI/2);
+					list.get(1).pose.setPose(correctedPosition.getX(), correctedPosition.getY(), correctedPosition.getTh()*PI/2);
+				}
+				
+				remainingField.setText(String.format("(%.2f, %.2f, %.2f)",
+						correctedPosition.getX(), correctedPosition.getY(), (correctedPosition.getTh()+4)%4));
 				mazeGraphics.setContRobots(list);
 				mazeGraphics.repaint();
 				
@@ -1059,13 +1117,15 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 			}
 
-			//remainingField.setValue("");
+			remainingField.setText("");
+			if (USE_SONARS) {
+				robot.turnSonarsOff();
+			}
 		}
 
 		public String toString() {
 			return "draw maze task";
 		}
 	}
-
 	private static final long serialVersionUID = 0;
 }

@@ -17,7 +17,7 @@ public class GradientDescent {
 	private static final double dy = 0.01;
 	private static final double dtheta = 0.01;
 	// TODO adjust this?
-	private static final double ERROR_THRESHOLD = 0.01;
+	private static final double ERROR_THRESHOLD = 0.05;
 
 	public interface ErrorFunction {
 		public double getError (double[] args);
@@ -26,7 +26,7 @@ public class GradientDescent {
 	public static void descend (ErrorFunction errFunc, double[] args) {
 		double error;
 		int counter = -1;
-		while ((error = errFunc.getError(args)) > ERROR_THRESHOLD && counter++ > -2) {
+		while ((error = errFunc.getError(args)) > ERROR_THRESHOLD && counter++ <= 1000) {
 			double[] gradient = computeGradient(errFunc, args);
 			final double STEP_SIZE = 0.001;
 			double dx = gradient[0] * STEP_SIZE;
