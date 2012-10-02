@@ -2,10 +2,14 @@ package edu.cmu.ri.mrpl.util;
 
 import static java.lang.Math.*;
 
+import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Point2D;
 
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
+import edu.cmu.ri.mrpl.maze.MazeLocalizer;
+import edu.cmu.ri.mrpl.maze.MazeState;
+import edu.cmu.ri.mrpl.maze.MazeWorld;
 import static edu.cmu.ri.mrpl.maze.MazeLocalizer.*;
 
 public class GradientDescent {
@@ -13,7 +17,7 @@ public class GradientDescent {
 	private static final double dy = 0.01;
 	private static final double dtheta = 0.01;
 	// TODO adjust this?
-	private static final double ERROR_THRESHOLD = 0.1;
+	private static final double ERROR_THRESHOLD = 0.01;
 
 	public interface ErrorFunction {
 		public double getError (double[] args);
@@ -28,19 +32,12 @@ public class GradientDescent {
 			double dx = gradient[0] * STEP_SIZE;
 			double dy = gradient[1] * STEP_SIZE;
 			double dtheta = gradient[2] * STEP_SIZE;
-			
-			// adjust theta before x and y
-			// TODO is this a good idea?
-			final double DTHETA_THRESHOLD = 0.0001;
-			if (abs(dtheta) < DTHETA_THRESHOLD) {
-				args[0] -= dx;
-				args[1] -= dy;
-			}
-			else {
-				args[2] -= dtheta;
-			}
+						
+			args[0] -= dx;
+			args[1] -= dy;
+			args[2] -= dtheta;
 
-			if (counter % 1000 == 0 && false) {
+			if (counter % 1000 == 0) {
 				System.err.println("counter: " + counter);
 				System.err.println("error = " + error);
 				System.err.println("gradient: " + gradient[0] + " " + gradient[1] + " " + gradient[2]);
@@ -84,50 +81,55 @@ public class GradientDescent {
 
 		// make a 3x3 grid of points that are one wall length apart
 		RingBuffer<RealPoint2D> points = new RingBuffer<RealPoint2D>(10);
-		for (int i = 0; i < 10; i++) {
-			points.add(new RealPoint2D(i*0.1, 0));
-		}
-		ErrorFunction fitter = new WallPointFitter(points);
-
-		ErrorFunction ghettoFitter = new ErrorFunction() {
-			public double getError (double[] coords) {
-				RealPose2D pose = new RealPose2D(coords[0], coords[1], coords[2]);
-				double err = 0;
-				//System.err.println(pose);
-				for (int i = 0; i < 10; i++) {
-					RealPoint2D onXaxis = new RealPoint2D(i*.1, 0);
-					Point2D transformed = pose.inverseTransform(onXaxis, null);
-					//System.err.println(transformed);
-					err += abs(transformed.getY());
-				}
-				//System.err.println(err);
-				return err;
-			}
-		};
 		
+		double sqrtDist = CELL_RADIUS*(sqrt(2)-1.5)*sqrt(2)/2;
+		double[] wall = new double[]{sqrtDist,sqrtDist,-(sqrt(2)-1)*CELL_RADIUS,CELL_RADIUS};
+		for (int i = 0; i <= wall.length-2; i+= 2) {
+			points.add(new RealPoint2D(wall[i], wall[i+1]));
+		}
+		
+		RealPose2D testPose = MazeLocalizer.mazeStateToWorldPose(new MazeState(0,0,MazeWorld.Direction.East));
+		ErrorFunction fitter = new WallPointFitter(points, testPose);
+		
+		// TODO JT: set useMe = fitter to try out the point cloud fitter from the lecture
 		ErrorFunction useMe = fitter;
 		
-		double[] coords = new double[]{0, 0, .1};
+		double[] coords = new double[]{testPose.getX(), testPose.getY(), testPose.getTh()};
 		
+		//*
 		descend(useMe, coords);
-		
 		for (double d : coords) {
 			System.out.println(d);
 		}
-		
 		System.out.println("error: " + useMe.getError(coords));
+		/*/
+		RealPose2D wrong = MazeLocalizer.mazeStateToWorldPose(new MazeState(0,0,MazeWorld.Direction.East));
+		RealPose2D right = new RealPose2D(1.5*CELL_RADIUS, CELL_RADIUS, -PI/4);
+		try {
+			wrong.inverseTransform(wall, 0, wall, 0, 2);
+		} catch (NoninvertibleTransformException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		right.transform(wall, 0, wall, 0, 2);
+		for (double d : wall) {
+			System.out.println(d);
+		}
+		//*/
 	}
 
 	public static class WallPointFitter implements ErrorFunction {
 		private RingBuffer<RealPoint2D> points;
+		private RealPose2D curPose;
 
-		public WallPointFitter (RingBuffer<RealPoint2D> points) {
+		public WallPointFitter (RingBuffer<RealPoint2D> points, RealPose2D curPose) {
 			this.points = points;
+			this.curPose = curPose;
 		}
 
 		public double getError (double[] args) {
 			RealPose2D pose = new RealPose2D(args[0], args[1], args[2]);
-			System.err.println("getError: pose = " + pose);
+			//System.err.println("getError: pose = " + pose);
 			double error = 0;
 
 			int count = 0;
@@ -141,7 +143,8 @@ public class GradientDescent {
 				count++;
 
 				// transform to frame of specified pose
-				Point2D transformed = pose.inverseTransform(point, null);
+				Point2D transformed = curPose.inverseTransform(point, null);
+				transformed = pose.transform(transformed, null);
 
 				// find the nearest wall
 				double x = transformed.getX();
