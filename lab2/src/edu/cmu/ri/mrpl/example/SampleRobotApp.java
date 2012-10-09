@@ -1005,7 +1005,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		MazeRobot mazeRobot;
 		JFrame wrapper;
 		
-		private static final boolean USE_SONARS = false;
+		private static final boolean USE_SONARS = true;
 
 		DrawMazeTask(TaskController tc, String fileName) throws IOException {
 			super(tc);
