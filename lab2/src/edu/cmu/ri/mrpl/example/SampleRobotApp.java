@@ -1234,7 +1234,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		MazeRobot mazeRobot;
 		JFrame wrapper;
 		
-		private final double LOOKAHEAD_DISTANCE = 0.65;
+		private final double LOOKAHEAD_DISTANCE = 0.6;
 
 		private static final boolean USE_SONARS = true;
 
