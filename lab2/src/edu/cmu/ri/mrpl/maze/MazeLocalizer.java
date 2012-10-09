@@ -50,6 +50,17 @@ public class MazeLocalizer {
 		return new RealPose2D(x, y, theta);
 	}
 	
+	public static RealPose2D fromMazeToWorld (RealPose2D cellPose) {
+		double x = cellPose.getX()*WALL_METERS + CELL_RADIUS;
+		double y = cellPose.getY()*WALL_METERS + CELL_RADIUS;
+		double theta = Angle.normalize(cellPose.getTh());
+		/*if (theta < 0) {
+			theta += 2*PI;
+		}*/
+		theta /= PI/2;
+		return new RealPose2D(x, y, theta);
+	}
+	
 	// converts a (x, y, dir) maze state
 	// to an (x, y, theta) pose in the maze world
 	public static RealPose2D mazeStateToWorldPose (MazeState state) {

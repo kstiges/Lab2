@@ -68,6 +68,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	private JButton quitButton;
 	private JButton executeButton;
 	private JButton loadMazeButton;
+	private JButton correctedFollowPathButton;
 
 	private java.util.LinkedList<Task> upcomingTasks;
 
@@ -108,6 +109,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		quitButton = new JButton(">> quit <<");
 		executeButton = new JButton("Execute File");
 		loadMazeButton = new JButton("Load Maze File");
+		correctedFollowPathButton = new JButton("Corrected Path Follower");
 
 		connectButton.addActionListener(this);
 		disconnectButton.addActionListener(this);
@@ -121,6 +123,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		quitButton.addActionListener(this);
 		executeButton.addActionListener(this);
 		loadMazeButton.addActionListener(this);
+		correctedFollowPathButton.addActionListener(this);
 
 		Container main = getContentPane();
 		main.setLayout(new BoxLayout(main, BoxLayout.Y_AXIS));
@@ -166,6 +169,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		box.add(Box.createHorizontalStrut(30));
 		box.add(loadMazeButton);
 
+		main.add(Box.createVerticalStrut(30));
+
+		box = Box.createHorizontalBox();
+		main.add(box);
+		box.add(correctedFollowPathButton);
+		
 		main.add(Box.createVerticalStrut(30));
 
 		box = Box.createHorizontalBox();
@@ -359,6 +368,15 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 
 			startUpcomingTasks();
+		} else if ( source==correctedFollowPathButton ) {
+			JFileChooser chooser = new JFileChooser();
+			int returnVal = chooser.showOpenDialog(this);
+			if(returnVal == JFileChooser.APPROVE_OPTION) {
+				System.out.println("You chose to open this file: " +
+						chooser.getSelectedFile().getName());
+			}
+			
+			addFileTasksToQueueForLab6(chooser.getSelectedFile().getPath());
 		}
 	}
 
@@ -381,6 +399,25 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		executeActionList(commandSequence);
 	}
 
+	public void addFileTasksToQueueForLab6(String mazeFileName) {
+		JFileChooser chooser = new JFileChooser();
+		int returnVal = chooser.showOpenDialog(this);
+		if(returnVal == JFileChooser.APPROVE_OPTION) {
+			System.out.println("You chose to open this file: " +
+					chooser.getSelectedFile().getName());
+		}
+
+		CommandSequence commandSequence = new CommandSequence();
+
+		try {
+			commandSequence.readFile(chooser.getSelectedFile().getPath());
+		} catch (IOException e) {
+			System.err.println("Couldn't read file");
+		}
+
+		executeActionListForLab6(commandSequence, mazeFileName);
+	}
+	
 	public synchronized boolean canStart(Task t) {
 		if (curTask!=null)
 			return false;
@@ -437,10 +474,54 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						pose.getY(),
 						pose.getTh()));
 				break;
-
 			case FOLLOWPATH:
 				Path path = ((Command.PathArgument) cmd.argument).path;
 				upcomingTasks.add(new FollowPathTask(this, path, 0.1));
+				break;
+
+			default:
+				System.err.println("unimplemented Command type: " + cmd.type);
+				new Speech().speak("unimplemented Command type: " + cmd.type);
+				break;
+			}
+		}
+
+		startUpcomingTasks();
+	}
+	
+	public void executeActionListForLab6 (ArrayList<Command> commands, String mazeFileName) {
+		for (Command cmd : commands) {
+			System.err.println(cmd.type);
+			switch (cmd.type) {
+			case PAUSE:
+				upcomingTasks.add(new PauseTask(this));
+				break;
+
+			case TURNTO:
+				upcomingTasks.add(new TurnToTask(this,
+						((Command.AngleArgument) cmd.argument).angle.angleValue()));
+				break;
+
+			case GOTO:
+				upcomingTasks.add(new GoToTask(this,
+						((Command.LengthArgument) cmd.argument).d));
+				break;
+
+			case WAIT:
+				upcomingTasks.add(new WaitTask(this,
+						((Command.LengthArgument) cmd.argument).d));
+				break;
+
+			case POSETO:
+				RealPose2D pose = ((Command.PoseArgument) cmd.argument).pose;
+				upcomingTasks.add(new PoseToTask(this,
+						pose.getX(),
+						pose.getY(),
+						pose.getTh()));
+				break;
+			case FOLLOWPATH:
+				Path path = ((Command.PathArgument) cmd.argument).path;
+				upcomingTasks.add(new CorrectedFollowPathTask(this, path, 0.1, mazeFileName));
 				break;
 
 			default:
@@ -1134,5 +1215,227 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			return "draw maze task";
 		}
 	}
+	
+	class CorrectedFollowPathTask extends Task {
+		// Globals from followpath
+		ArrayList<RealPose2D> desiredPath;
+		java.util.List<Line2D> pathSegments;
+		double maxDeviation;
+		RealPose2D robotStartedHere;
+		Controller controller;
+		Speech speech;
+
+		// globals from mazedrawer
+		Perceptor perceptor;
+		MazeLocalizer correctedLocalizer;
+		MazeLocalizer rawLocalizer;
+		MazeWorld mazeWorld;
+		MazeGraphics mazeGraphics;
+		MazeRobot mazeRobot;
+		JFrame wrapper;
+		
+		private final double LOOKAHEAD_DISTANCE = 0.65;
+
+		private static final boolean USE_SONARS = true;
+
+		CorrectedFollowPathTask(TaskController tc, ArrayList<RealPose2D> poses, double maxDeviation, String mazeFileName) {
+			super(tc);
+			//this.tc = tc;
+			setDesiredPath(poses, maxDeviation);
+			
+			try {
+				mazeWorld = new MazeWorld(mazeFileName);
+			} catch (IOException e) {
+				System.err.println("Couldn't read maze file!");
+			}
+			mazeGraphics = new MazeGraphics(mazeWorld);
+			
+			// construct corrected localizer
+			correctedLocalizer = new MazeLocalizer(mazeWorld, false);
+			// save init
+			MazeState init = mazeWorld.getInits().iterator().next();
+			
+			if (!USE_SONARS) {
+				mazeWorld.removeAllInits();
+				mazeWorld.addInit(new MazeState(0, 0, MazeWorld.Direction.East));
+			}
+			
+			// construct uncorrected localizer
+			rawLocalizer = new MazeLocalizer(mazeWorld, true);
+		
+			if (!USE_SONARS) {
+				// replace original init
+				mazeWorld.removeAllInits();
+				mazeWorld.addInit(init);
+			}
+			
+			if (USE_SONARS) {
+				robot.turnSonarsOn();
+			}
+			
+			perceptor = new Perceptor(robot);
+			perceptor.setCorrectedPose(MazeLocalizer.mazeStateToWorldPose(init));
+			wrapper = new JFrame();
+			wrapper.add(mazeGraphics);
+			wrapper.setSize(400, 400);
+			wrapper.setVisible(true);
+		}
+		
+		public void setDesiredPath (ArrayList<RealPose2D> poses, double maxDeviation) {
+			controller = new Controller(robot);
+			perceptor = new Perceptor(robot);
+			desiredPath = new ArrayList<RealPose2D>(poses);
+			this.maxDeviation = maxDeviation;
+
+			// construct list of line segments
+			pathSegments = Lookahead.posesToPath(poses);
+			System.err.println(desiredPath.size() + " PATH SEGMENTS");
+		}
+
+		public void taskRun() {
+			RingBuffer<Point2D> pointsBuffer;
+			RealPoint2D[] sonarPointsBuffer;
+			double[] directSonarReadings;
+			
+			robot.updateState();
+			speech = new Speech();
+			double Kp = 2;
+			//double Kd = 10;
+			//double u = 0;
+
+			robotStartedHere = perceptor.getWorldPose();
+			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
+//			RealPoint2D tmp = new RealPoint2D();
+//			Lookahead.findLookaheadPoint(pathSegments, curPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
+//			Point2D destPointRelCur = robotStartedHere.inverseTransform(tmp, null);
+
+//			double[] arcInfo = calculateArc(destPointRelCur);
+//			double distanceErr = arcInfo[1];
+			
+			if (USE_SONARS) {
+				pointsBuffer = new RingBuffer<Point2D>(400);
+				sonarPointsBuffer = null;
+				directSonarReadings = new double[16];
+			}
+			
+			java.util.List<ContRobot> list = Collections.synchronizedList(new ArrayList<ContRobot>()); 
+			RealPose2D correctedPosition = correctedLocalizer.fromInitToCell(perceptor.getCorrectedPose());
+			RealPose2D rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
+			list.add(new ContRobot(rawPosition, Color.RED));
+			list.add(new ContRobot(correctedPosition, Color.GREEN));
+			
+			mazeGraphics.setContRobots(list);
+			
+			RealPose2D curPose = perceptor.getCorrectedPose();
+			
+			// TODO: Look at my comment below using this same garbage...
+			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - .3683, perceptor.getCorrectedPose().getY() - .3683, perceptor.getCorrectedPose().getTh());
+			
+			RealPose2D lastPollPosition = perceptor.getCorrectedPose();
+			RealPose2D lastGradientPosition = perceptor.getCorrectedPose();
+			
+			RealPoint2D tmp = new RealPoint2D();
+			Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
+			Point2D destPointRelCur = robotStartedHere.inverseTransform(tmp, null);
+			
+			double pollInterval = 0.01; // meters between polling the sonars
+			double gradientInterval = .1; // meters between running gradient descent on points
+						
+			double[] arcInfo = calculateArc(destPointRelCur);
+			double distanceErr = arcInfo[1];
+			
+			while(!shouldStop() &&
+					(abs(distanceErr) > DISTANCE_TOLERANCE
+							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
+			{
+				robot.updateState();
+				curPose = perceptor.getCorrectedPose();
+					
+				if (USE_SONARS && curPose.getPosition().distance(lastPollPosition.getPosition())  > pollInterval) {
+					lastPollPosition = curPose;
+					
+					robot.getSonars(directSonarReadings);
+					sonarPointsBuffer = perceptor.getSonarObstacles();
+					for (int i=0; i<sonarPointsBuffer.length; i++) {
+						// only use the sonar readings that are within a certain distance
+						if (directSonarReadings[i] < 2.0 ) {
+							pointsBuffer.add(correctedLocalizer.transformInitToWorld(perceptor.getCorrectedPose().transform(sonarPointsBuffer[i], null)));
+						}
+					}
+				}
+				
+				// Every interval (.25 meters) do this
+				// Run gradient descent and correct the position of the robot in the maze based on the sonars and the walls
+				if (USE_SONARS && curPose.getPosition().distance(lastGradientPosition.getPosition()) > gradientInterval) {
+					
+					ErrorFunction fitter = new GradientDescent.WallPointFitter(pointsBuffer, curPose);
+					double[] coords = new double[]{curPose.getX(), curPose.getY(), curPose.getTh()};
+					GradientDescent.descend(fitter, coords);
+					
+					curPose.setPose(coords[0], coords[1], coords[2]);
+					lastGradientPosition = curPose;
+					lastPollPosition = curPose;
+					
+					perceptor.setCorrectedPose(curPose);
+					
+					// Clear the points buffer
+					pointsBuffer.clear();
+				}
+				
+				correctedPosition = correctedLocalizer.fromInitToCell(perceptor.getCorrectedPose());
+				rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
+				
+				synchronized(list) {
+					list.get(0).pose.setPose(rawPosition.getX(), rawPosition.getY(), rawPosition.getTh()*PI/2);
+					list.get(1).pose.setPose(correctedPosition.getX(), correctedPosition.getY(), correctedPosition.getTh()*PI/2);
+				}
+				
+				remainingField.setText(String.format("(%.2f, %.2f, %.2f)",
+						correctedPosition.getX(), correctedPosition.getY(), (correctedPosition.getTh()+4)%4));
+				mazeGraphics.setContRobots(list);
+				mazeGraphics.repaint();
+				
+				// remove the old lookahead point
+				if (robot instanceof SimRobot) {
+					((SimRobot) robot).deleteObstacle(tmp.getX(), tmp.getY());
+				}
+				
+				// TODO: Make this right...so essentially what I'm doing here is subtracting half of the width of a cell from the X and Y of this correctedPose because
+				// it should have been at 0,0 when it was saying .3683, .3683
+				// It's late and I can't wrap my brain around the needed transform so I just did this and it seems to work except the robot has become "sloppy" now
+				// instead of the nice smooth runs we had in Lab 4
+				correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - .3683, perceptor.getCorrectedPose().getY() - .3683, perceptor.getCorrectedPose().getTh());
+
+				Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
+				destPointRelCur = correctedPoseRelStart.inverseTransform(tmp, null);
+
+				// draw the lookahead point
+				if (robot instanceof SimRobot) {
+					if (tmp.distance(perceptor.getWorldPose().getPosition()) > .25) {
+						((SimRobot) robot).addObstacle(tmp.getX(), tmp.getY(), 0.01);
+					}
+				}
+				
+				arcInfo = calculateArc(destPointRelCur);
+				controller.setCurvVel(1.0/arcInfo[0], Kp*arcInfo[1]);
+				
+				try {
+					Thread.sleep(50);
+				} catch(InterruptedException iex) {
+					System.err.println("draw maze interrupted");
+				}
+			}
+
+			remainingField.setText("");
+			if (USE_SONARS) {
+				robot.turnSonarsOff();
+			}
+		}
+
+		public String toString() {
+			return "draw maze task";
+		}
+	}
+	
 	private static final long serialVersionUID = 0;
 }
