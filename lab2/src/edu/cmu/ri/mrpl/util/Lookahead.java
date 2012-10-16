@@ -99,7 +99,7 @@ public class Lookahead {
 			if (segmentLength < lookaheadDistance) {
 				lookaheadDistance -= segmentLength;
 				closestPoint = new RealPoint2D(segmentEnd.getX(), segmentEnd.getY());
-				System.out.println("LOOKAHEAD ON SEGMENT AFTER " + i);
+				//System.out.println("LOOKAHEAD ON SEGMENT AFTER " + i);
 				continue;
 			}
 			// otherwise, the lookahead point is on this segment, so find it

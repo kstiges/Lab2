@@ -1,9 +1,14 @@
 package edu.cmu.ri.mrpl.maze;
 
 import java.awt.geom.Point2D;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Scanner;
 
+import javax.swing.text.Position;
+
 import edu.cmu.ri.mrpl.kinematics2D.Angle;
+import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
 import edu.cmu.ri.mrpl.maze.MazeWorld.Direction;
 import static java.lang.Math.*;
@@ -70,25 +75,47 @@ public class MazeLocalizer {
 		return new RealPose2D(x, y, theta);
 	}
 	
+	public static List<RealPose2D> statesToPoses (List<MazeState> states) {
+		List<RealPose2D> result = new LinkedList<RealPose2D>();
+		
+		RealPoint2D lastPosition = null;
+		
+		for (MazeState s : states) {
+			RealPose2D pose = mazeStateToWorldPose(s);
+			
+			// skip pairs of poses in the same position
+			RealPoint2D position = pose.getPosition();
+			if (position.equals(lastPosition))
+				result.remove(result.size() - 1);
+			lastPosition = position;
+			
+			// TODO generalize this
+			result.add(new RealPose2D(pose.getX()-CELL_RADIUS, pose.getY()-CELL_RADIUS, pose.getTh()));
+		}
+		
+		return result;
+	}
+	
 	/*
 	public static void main (String... args) {
-		MazeWorld world = new MazeWorld(5, 3);
-		world.addInit(2, 1, Direction.North);
+		int[] coords = new int[]{
+				0,0,
+				5,0,
+				5,1,
+				2,1,
+				2,2,
+				1,2,
+				1,1,
+				0,1,
+				0,3,
+				5,3,
+				5,0,
+				0,0
+		};
 		
-		MazeLocalizer local = new MazeLocalizer(world);
-		Scanner scanner = new Scanner(System.in);
-		while (true) {
-			System.out.println("Enter x:");
-			double x = scanner.nextDouble();
-			
-			System.out.println("Enter y:");
-			double y = scanner.nextDouble();
-			
-			System.out.println("Enter theta:");
-			double theta = scanner.nextDouble();
-			
-			System.out.println(
-				local.fromInitToCell(new RealPose2D(x, y, theta)));
+		for (int i = 0; i < coords.length; i += 2) {
+			RealPose2D pose = mazeStateToWorldPose(new MazeState(coords[i], coords[i+1], Direction.East));
+			System.out.printf("%f,%f,%f;", pose.getX()-CELL_RADIUS, pose.getY()-CELL_RADIUS, pose.getTh());
 		}
 	}
 	*/

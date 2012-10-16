@@ -37,6 +37,7 @@ public class GradientDescent {
 			args[1] -= dy;
 			args[2] -= dtheta;
 
+			/*
 			if (counter % 1000 == 0) {
 				System.err.println("counter: " + counter);
 				System.err.println("error = " + error);
@@ -45,6 +46,7 @@ public class GradientDescent {
 				System.err.println("args: " + args[0] + " " + args[1] + " " + args[2]);
 				System.err.println();
 			}
+			*/
 		}
 	}
 
