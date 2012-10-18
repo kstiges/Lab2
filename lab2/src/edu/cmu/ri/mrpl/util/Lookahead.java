@@ -86,6 +86,7 @@ public class Lookahead {
 		// find closest point and segment
 		RealPoint2D closestPoint = new RealPoint2D();
 		int closestSegmentIndex = findClosestPoint(pathSegments, robotRelWorld, closestPoint);
+		//System.err.println(closestSegmentIndex);
 
 		// try every segment until the lookahead distance is reached
 		for (int i = closestSegmentIndex; i < pathSegments.size(); i++) {

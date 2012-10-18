@@ -946,7 +946,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			// construct list of line segments
 			pathSegments = Lookahead.posesToPath(poses);
-			System.err.println(desiredPath.size() + " PATH SEGMENTS");
+			//System.err.println(desiredPath.size() + " PATH SEGMENTS");
 		}
 
 		// setDesiredPath should be called before calling this method
@@ -1232,6 +1232,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private static final boolean USE_SONARS = true;
 		
 		private TaskController tc;
+		
+		MazeState init;
 
 		SolveMazeTask(TaskController tc, double maxDeviation, String mazeFileName) {
 			super(tc);
@@ -1252,7 +1254,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			// construct corrected localizer
 			correctedLocalizer = new MazeLocalizer(mazeWorld, false);
 			// save init
-			MazeState init = mazeWorld.getInits().iterator().next();
+			init = mazeWorld.getInits().iterator().next();
 			
 			if (!USE_SONARS) {
 				mazeWorld.removeAllInits();
@@ -1288,7 +1290,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			// construct list of line segments
 			pathSegments = Lookahead.posesToPath(poses);
-			System.err.println(desiredPath.size() + " PATH SEGMENTS");
+			//System.err.println(desiredPath.size() + " PATH SEGMENTS");
 		}
 
 		public void taskRun() {
@@ -1329,6 +1331,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			// TODO: Look at my comment below using this same garbage...
 			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - .3683, perceptor.getCorrectedPose().getY() - .3683, perceptor.getCorrectedPose().getTh());
+			//RealPose2D correctedPoseRelStart = RealPose2D.multiply(MazeLocalizer.mazeStateToWorldPose(init).inverse(), perceptor.getCorrectedPose());
 			
 			RealPose2D lastPollPosition = perceptor.getCorrectedPose();
 			RealPose2D lastGradientPosition = perceptor.getCorrectedPose();
@@ -1419,6 +1422,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				// It's late and I can't wrap my brain around the needed transform so I just did this and it seems to work except the robot has become "sloppy" now
 				// instead of the nice smooth runs we had in Lab 4
 				correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - .3683, perceptor.getCorrectedPose().getY() - .3683, perceptor.getCorrectedPose().getTh());
+				//correctedPoseRelStart = RealPose2D.multiply(MazeLocalizer.mazeStateToWorldPose(init).inverse(), perceptor.getCorrectedPose());
 
 				segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
 				destPointRelCur = correctedPoseRelStart.inverseTransform(tmp, null);
@@ -1440,9 +1444,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						double targetTheta = desiredPath.get(desiredPath.size() - 1).getTh();
 						double curTheta = correctedPoseRelStart.getTh();
 						double dTheta = Angle.normalize(targetTheta - curTheta);
+						/*
 						System.out.println(targetTheta);
 						System.out.println(curTheta);
 						System.out.println(dTheta);
+						*/
 						upcomingTasks.add(0, new TurnToTask(tc, dTheta));
 						break;
 					}
