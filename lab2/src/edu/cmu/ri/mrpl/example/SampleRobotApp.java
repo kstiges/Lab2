@@ -1361,7 +1361,19 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					for (int i=0; i<sonarPointsBuffer.length; i++) {
 						// only use the sonar readings that are within a certain distance
 						if (directSonarReadings[i] < 2.0 ) {
+							/* 
+							 * TODO: use this transformed point with
+							 * ProbabilisticWallGrid.hitNearestWall
+							 * to register sonar wall hits
+							 */
 							pointsBuffer.add(correctedLocalizer.transformInitToWorld(perceptor.getCorrectedPose().transform(sonarPointsBuffer[i], null)));
+							/*
+							 * TODO: figure out how to find wall misses
+							 * I think it has to do with getting the current position of the robot,
+							 * calculating where the nearest possible walls are in every sonar direction,
+							 * then seeing if the hit from that sonar is farther than it should be
+							 * if the nearest possible wall were there.
+							 */
 						}
 					}
 				}

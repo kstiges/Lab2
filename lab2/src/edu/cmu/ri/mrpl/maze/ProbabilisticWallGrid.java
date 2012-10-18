@@ -1,10 +1,8 @@
 package edu.cmu.ri.mrpl.maze;
 
-public class ProbabilisticWallGrid {
-	// maze dimensions
-	private int width;
-	private int height;
+import java.awt.geom.Point2D;
 
+public class ProbabilisticWallGrid {
 	// Hold hits/misses for horizontal and vertical walls separately.
 	// Indexed by x, then y, then hits (0) or misses (1)
 	private int[][][] horizontalWalls;
@@ -16,14 +14,12 @@ public class ProbabilisticWallGrid {
 	private static final int WEST = 2;
 	private static final int SOUTH = 3;
 
-	// To be said to exist, a wall must have at least this probability of existence. Adjust this as needed.
+	// To be said to exist, a wall must have at least this probability of existence.
+	// Adjust this as needed.
 	private static final double EXIST_PROB_THRESHOLD = 0.6;
 
 	// Constructs a wall grid for a maze of given width/height
-	public ProbabilisticWallGrid (int width, int height) {
-		this.width = width;
-		this.height = height;
-		
+	public ProbabilisticWallGrid (int width, int height) {		
 		horizontalWalls = new int[width][height+1][2];
 		verticalWalls = new int[width+1][height][2];
 	}
@@ -32,6 +28,11 @@ public class ProbabilisticWallGrid {
 	public void hitWall (int cellX, int cellY, int wallDirection) {
 		getWall(cellX, cellY, wallDirection)[0]++;
 	}
+	
+	public void hitNearestWall (Point2D hitRelMaze) {
+		MazeState wall = MazeLocalizer.getClosestWall(hitRelMaze);
+		hitWall(wall.x(), wall.y(), wall.dir().ordinal());
+	}
 
 	// Indicate a sonar miss on the wall at the given x, y, and direction
 	public void missWall (int cellX, int cellY, int wallDirection) {
@@ -39,7 +40,7 @@ public class ProbabilisticWallGrid {
 	}
 
 	// Determine whether a wall exists at the given x, y, and direction
-	public boolean isWall (int cellX, int cellY, int wallDirection) {
+	public boolean wallExists (int cellX, int cellY, int wallDirection) {
 		return getWallProbability (cellX, cellY, wallDirection) >= EXIST_PROB_THRESHOLD;
 	}
 
@@ -117,7 +118,7 @@ public class ProbabilisticWallGrid {
 				for (int d = 0; d < 4; d++) {
 					int hits = pwg.getWallHits(x,y,d);
 					int total = pwg.getWallTotal(x,y,d);
-					boolean isWall = pwg.isWall(x,y,d);
+					boolean isWall = pwg.wallExists(x,y,d);
 					System.out.printf("(%d,%d,%d): %d/%d, %b\n", x, y, d, hits, total, isWall);
 				}
 				System.out.println();
