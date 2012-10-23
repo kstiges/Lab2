@@ -2,6 +2,8 @@ package edu.cmu.ri.mrpl.maze;
 
 import java.awt.geom.Point2D;
 
+import edu.cmu.ri.mrpl.maze.MazeWorld.Direction;
+
 public class ProbabilisticWallGrid {
 	// Hold hits/misses for horizontal and vertical walls separately.
 	// Indexed by x, then y, then hits (0) or misses (1)
@@ -23,6 +25,18 @@ public class ProbabilisticWallGrid {
 		horizontalWalls = new int[width][height+1][2];
 		verticalWalls = new int[width+1][height][2];
 	}
+	
+	public ProbabilisticWallGrid(MazeWorld mw) {
+		this(mw.getWidth(), mw.getHeight());
+	}
+	
+	public int getWidth() {
+		return horizontalWalls.length;
+	}
+	
+	public int getHeight() {
+		return verticalWalls[0].length;
+	}
 
 	// Indicate a sonar hit on the wall at the given x, y, and direction
 	public void hitWall (int cellX, int cellY, int wallDirection) {
@@ -30,8 +44,16 @@ public class ProbabilisticWallGrid {
 	}
 	
 	public void hitNearestWall (Point2D hitRelMaze) {
-		MazeState wall = MazeLocalizer.getClosestWall(hitRelMaze);
-		hitWall(wall.x(), wall.y(), wall.dir().ordinal());
+		MazeState wall = MazeLocalizer.getClosestWall(hitRelMaze, getWidth(), getHeight());
+		try {
+			hitWall(wall.x(), wall.y(), wall.dir().ordinal());
+		}
+		catch (ArrayIndexOutOfBoundsException e) {
+			System.err.println("out of bounds");
+			System.err.println(hitRelMaze);
+			System.err.println(wall);
+			System.err.println();
+		}
 	}
 
 	// Indicate a sonar miss on the wall at the given x, y, and direction
@@ -48,6 +70,10 @@ public class ProbabilisticWallGrid {
 	public double getWallProbability (int cellX, int cellY, int wallDirection) {
 		int hits = getWallHits(cellX, cellY, wallDirection);
 		int total = getWallTotal(cellX, cellY, wallDirection);
+		// assume walls that have no hits or misses don't exist
+		if (total == 0) {
+			return 0;
+		}
 		return (double) hits / total;
 	}
 
@@ -84,6 +110,31 @@ public class ProbabilisticWallGrid {
 		}
 		else {
 			return null;
+		}
+	}
+	
+	// Constructs a MazeWorld with walls where they are according to the grid.
+	public void updateMazeWorld (MazeWorld mw) {
+		int width = mw.getWidth();
+		int height = mw.getHeight();
+		
+		mw.removeAllWalls();
+		
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				if (wallExists(x, y, SOUTH)) {
+					mw.addWall(x, y, Direction.South);
+				}
+				if (wallExists(x, y, WEST)) {
+					mw.addWall(x, y, Direction.West);
+				}
+				if (y == height - 1 && wallExists(x, y, NORTH)) {
+					mw.addWall(x, y, Direction.North);
+				}
+				if (x == width - 1 && wallExists(x, y, EAST)) {
+					mw.addWall(x, y, Direction.East);
+				}
+			}
 		}
 	}
 

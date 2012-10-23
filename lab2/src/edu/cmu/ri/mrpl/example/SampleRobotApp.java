@@ -38,6 +38,7 @@ import edu.cmu.ri.mrpl.maze.MazeRobot;
 import edu.cmu.ri.mrpl.maze.MazeSolver;
 import edu.cmu.ri.mrpl.maze.MazeState;
 import edu.cmu.ri.mrpl.maze.MazeWorld;
+import edu.cmu.ri.mrpl.maze.ProbabilisticWallGrid;
 import edu.cmu.ri.mrpl.util.AngleMath;
 import edu.cmu.ri.mrpl.util.GradientDescent;
 import edu.cmu.ri.mrpl.util.GradientDescent.WallPointFitter;
@@ -428,7 +429,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					
 					startUpcomingTasks();
 				} catch (IOException e1) {
-					// TODO Auto-generated catch block
 					e1.printStackTrace();
 				}
 			}
@@ -1227,6 +1227,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		MazeRobot mazeRobot;
 		JFrame wrapper;
 		
+		ProbabilisticWallGrid pwg;
+		
 		private final double LOOKAHEAD_DISTANCE = 0.6;
 
 		private static final boolean USE_SONARS = true;
@@ -1245,8 +1247,10 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				System.err.println("Couldn't read maze file!");
 			}
 			mazeGraphics = new MazeGraphics(mazeWorld);
+			pwg = new ProbabilisticWallGrid(mazeWorld);
 			
 			java.util.List<RealPose2D> poses;
+			// TODO take explicit path rather than using MazeSolver
 			List<MazeState> states = new MazeSolver(mazeWorld).findPath();
 			poses = MazeLocalizer.statesToPoses(states);
 			setDesiredPath(poses, maxDeviation);
@@ -1361,12 +1365,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					for (int i=0; i<sonarPointsBuffer.length; i++) {
 						// only use the sonar readings that are within a certain distance
 						if (directSonarReadings[i] < 2.0 ) {
-							/* 
-							 * TODO: use this transformed point with
-							 * ProbabilisticWallGrid.hitNearestWall
-							 * to register sonar wall hits
-							 */
-							pointsBuffer.add(correctedLocalizer.transformInitToWorld(perceptor.getCorrectedPose().transform(sonarPointsBuffer[i], null)));
+							Point2D hitRelMaze = correctedLocalizer.transformInitToWorld(perceptor.getCorrectedPose().transform(sonarPointsBuffer[i], null));
+							pointsBuffer.add(hitRelMaze);
+							pwg.hitNearestWall(hitRelMaze);
 							/*
 							 * TODO: figure out how to find wall misses
 							 * I think it has to do with getting the current position of the robot,
@@ -1376,6 +1377,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 							 */
 						}
 					}
+					
+					// update the maze walls on the display
+					pwg.updateMazeWorld(mazeWorld);
 				}
 				
 				// Every interval (.25 meters) do this

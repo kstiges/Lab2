@@ -18,11 +18,13 @@ public class MazeLocalizer {
 	public static final double CELL_RADIUS = WALL_METERS / 2;
 	
 	private RealPose2D initRelWorld;
+	private MazeWorld maze;
 	
 	public MazeLocalizer (MazeWorld maze, boolean isWrong) {
 		initRelWorld = isWrong
 			? mazeStateToWorldPose(maze.getInits().iterator().next())
 			: new RealPose2D();
+		this.maze = maze;
 	}
 	
 	// given the pose of the robot relative to its origin,
@@ -99,12 +101,19 @@ public class MazeLocalizer {
 	 * returns a MazeState representing the nearest wall.
 	 * This MazeState can be used with ProbabilisticWallGrid.hitWall to associate sonar hits.
 	 */
-	public static MazeState getClosestWall (Point2D hitRelMaze) {
+	public static MazeState getClosestWall (Point2D hitRelMaze, int width, int height) {
 		double x = hitRelMaze.getX();
 		double y = hitRelMaze.getY();
 		
 		int col = (int) floor(x / WALL_METERS);
+		// clamp to maze
+		col = max(col, 0);
+		col = min(col, width-1);
+		
 		int row = (int) floor(y / WALL_METERS);
+		// clamp to maze
+		row = max(row, 0);
+		row = min(row, height-1);
 		
 		double xClosestWall = round(x / WALL_METERS) * WALL_METERS;
 		double yClosestWall = round(y / WALL_METERS) * WALL_METERS;
@@ -138,7 +147,7 @@ public class MazeLocalizer {
 			Point2D hit = new Point2D.Double(hitX, hitY);
 			
 			System.out.printf("cell coords: (%.2f, %.2f)\n", cellX, cellY);
-			System.out.println(getClosestWall(hit));
+			System.out.println(getClosestWall(hit, width, height));
 			System.out.println();
 		}
 	}
