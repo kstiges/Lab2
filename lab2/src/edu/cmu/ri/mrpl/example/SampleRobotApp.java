@@ -38,6 +38,7 @@ import edu.cmu.ri.mrpl.maze.MazeRobot;
 import edu.cmu.ri.mrpl.maze.MazeSolver;
 import edu.cmu.ri.mrpl.maze.MazeState;
 import edu.cmu.ri.mrpl.maze.MazeWorld;
+import edu.cmu.ri.mrpl.maze.MazeWorld.Direction;
 import edu.cmu.ri.mrpl.maze.ProbabilisticWallGrid;
 import edu.cmu.ri.mrpl.util.AngleMath;
 import edu.cmu.ri.mrpl.util.GradientDescent;
@@ -1365,9 +1366,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					for (int i=0; i<sonarPointsBuffer.length; i++) {
 						// only use the sonar readings that are within a certain distance
 						if (directSonarReadings[i] < 2.0 ) {
-							Point2D hitRelMaze = correctedLocalizer.transformInitToWorld(perceptor.getCorrectedPose().transform(sonarPointsBuffer[i], null));
+							Point2D hitRelRobot = curPose.transform(sonarPointsBuffer[i], null);
+							Point2D hitRelMaze = correctedLocalizer.transformInitToWorld(hitRelRobot);
 							pointsBuffer.add(hitRelMaze);
 							pwg.hitNearestWall(hitRelMaze);
+							
 							/*
 							 * TODO: figure out how to find wall misses
 							 * I think it has to do with getting the current position of the robot,
@@ -1375,6 +1378,36 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 							 * then seeing if the hit from that sonar is farther than it should be
 							 * if the nearest possible wall were there.
 							 */
+							if (directSonarReadings[i] > MazeLocalizer.WALL_METERS) {
+								Point2D robotCell = MazeLocalizer.fromWorldToCell(curPose).getPosition();
+								double xCell = robotCell.getX();
+								double yCell = robotCell.getY();
+								int xRound = (int) round(robotCell.getX());
+								int yRound = (int) round(robotCell.getY());
+								double neCornerAngle = atan2(yRound + 0.5 - yCell, xRound + 0.5 - xCell);
+								double nwCornerAngle = atan2(yRound + 0.5 - yCell, xRound - 0.5 - xCell);
+								double swCornerAngle = atan2(yRound - 0.5 - yCell, xRound - 0.5 - xCell);
+								double seCornerAngle = atan2(yRound - 0.5 - yCell, xRound + 0.5 - xCell);
+								double sonarAngle = atan2(hitRelRobot.getY(), hitRelRobot.getX());
+								
+								// east wall
+								if (seCornerAngle < sonarAngle && sonarAngle < neCornerAngle) {
+									pwg.missWall(xRound, yRound, Direction.East);
+								}
+								// north wall
+								else if (neCornerAngle < sonarAngle && sonarAngle < nwCornerAngle) {
+									pwg.missWall(xRound, yRound, Direction.North);
+								}
+								// west wall
+								// note that we use || instead of && here, due to angles being within +/- pi
+								else if (nwCornerAngle < sonarAngle || sonarAngle < swCornerAngle) {
+									pwg.missWall(xRound, yRound, Direction.West);
+								}
+								// south wall
+								else /*if (swCornerAngle < sonarAngle && sonarAngle < seCornerAngle)*/ {
+									pwg.missWall(xRound, yRound, Direction.South);
+								}
+							}
 						}
 					}
 					
