@@ -26,7 +26,7 @@ public class GradientDescent {
 	public static void descend (ErrorFunction errFunc, double[] args) {
 		double error;
 		int counter = -1;
-		while ((error = errFunc.getError(args)) > ERROR_THRESHOLD && counter++ <= 1000) {
+		while ((error = errFunc.getError(args)) > ERROR_THRESHOLD && counter++ <= 500) {
 			double[] gradient = computeGradient(errFunc, args);
 			final double STEP_SIZE = 0.001;
 			double dx = gradient[0] * STEP_SIZE;

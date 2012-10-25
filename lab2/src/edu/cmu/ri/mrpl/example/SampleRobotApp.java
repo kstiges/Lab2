@@ -1397,6 +1397,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						if ((i==0 || i==4 || i==8 || i==12) && directSonarReadings[i] < 1.1*lastSonarReadings[i] && directSonarReadings[i] > .9*lastSonarReadings[i]) {							
 						//	pwg.hitNearestWall(hitRelMaze);
 							
+							
 							if ((directSonarReadings[i] + ROBOT_RADIUS) > MazeLocalizer.WALL_METERS) {
 								Point2D robotCell = MazeLocalizer.fromWorldToCell(curPose).getPosition();
 								double xCell = robotCell.getX();
@@ -1481,35 +1482,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 										break;
 									}
 								}
-							
-								/*
-								double neCornerAngle = atan2(yRound + 0.5 - yCell, xRound + 0.5 - xCell);
-								double nwCornerAngle = atan2(yRound + 0.5 - yCell, xRound - 0.5 - xCell);
-								double swCornerAngle = atan2(yRound - 0.5 - yCell, xRound - 0.5 - xCell);
-								double seCornerAngle = atan2(yRound - 0.5 - yCell, xRound + 0.5 - xCell);
-								double sonarAngle = atan2(hitRelRobot.getY(), hitRelRobot.getX());
-								
-								// east wall
-								if (seCornerAngle < sonarAngle && sonarAngle < neCornerAngle) {
-									pwg.missWall(xRound, yRound, Direction.East);
-									System.out.println("Missing east");
-								}
-								// north wall
-								else if (neCornerAngle < sonarAngle && sonarAngle < nwCornerAngle) {
-									pwg.missWall(xRound, yRound, Direction.North);
-									System.out.println("Missing north");
-								}
-								// west wall
-								// note that we use || instead of && here, due to angles being within +/- pi
-								else if (nwCornerAngle < sonarAngle || sonarAngle < swCornerAngle) {
-									pwg.missWall(xRound, yRound, Direction.West);
-									System.out.println("Missing west");
-								}
-								// south wall
-								else /*if (swCornerAngle < sonarAngle && sonarAngle < seCornerAngle)/ {
-									pwg.missWall(xRound, yRound, Direction.South);
-									System.out.println("Missing south");
-								}*/
 							} else if (!(Math.abs(hitRelMaze.getX()-WALL_METERS*(round(hitRelMaze.getX()/WALL_METERS))) < .1*WALL_METERS && Math.abs(hitRelMaze.getY()-WALL_METERS*(round(hitRelMaze.getY()/WALL_METERS))) < .1*WALL_METERS)){
 								pwg.hitNearestWall(hitRelMaze);
 							}
