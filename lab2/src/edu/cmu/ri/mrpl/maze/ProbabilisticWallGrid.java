@@ -10,15 +10,18 @@ public class ProbabilisticWallGrid {
 	// Indexed by x, then y, then hits (0) or misses (1)
 	private int[][][] horizontalWalls;
 	private int[][][] verticalWalls;
+	private int mazeWidth, mazeHeight; // in cells
 
 	// To be said to exist, a wall must have at least this probability of existence.
 	// Adjust this as needed.
-	private static final double EXIST_PROB_THRESHOLD = 0.6;
+	private static final double EXIST_PROB_THRESHOLD = 0.85;
 
 	// Constructs a wall grid for a maze of given width/height
 	public ProbabilisticWallGrid (int width, int height) {		
 		horizontalWalls = new int[width][height+1][2];
 		verticalWalls = new int[width+1][height][2];
+		mazeWidth = width - 1;
+		mazeHeight = height - 1;
 	}
 	
 	public ProbabilisticWallGrid(MazeWorld mw) {
@@ -42,6 +45,7 @@ public class ProbabilisticWallGrid {
 		MazeState wall = MazeLocalizer.getClosestWall(hitRelMaze, getWidth(), getHeight());
 		try {
 			hitWall(wall.x(), wall.y(), wall.dir());
+			//System.err.println("Hitting " + wall.dir() + " " + wall.x() + "," + wall.y() + ", " + wall.dir());
 		}
 		catch (ArrayIndexOutOfBoundsException e) {
 			System.err.println("out of bounds");
@@ -53,6 +57,7 @@ public class ProbabilisticWallGrid {
 
 	// Indicate a sonar miss on the wall at the given x, y, and direction
 	public void missWall (int cellX, int cellY, Direction wallDirection) {
+		//System.out.println("Missing: " + cellX + ", " + cellY + " " + wallDirection);
 		getWall(cellX, cellY, wallDirection)[1]++;
 	}
 
@@ -106,7 +111,7 @@ public class ProbabilisticWallGrid {
 		int width = mw.getWidth();
 		int height = mw.getHeight();
 		
-		mw.removeAllWalls();
+		//mw.removeAllWalls();
 		
 		for (int y = 0; y < height; y++) {
 			for (int x = 0; x < width; x++) {
@@ -114,7 +119,7 @@ public class ProbabilisticWallGrid {
 					if (wallExists(x, y, South)) {
 						mw.addWall(x, y, South);
 					}
-					else {
+					else if (!isOutsideWall(x, y, South)) {
 						mw.removeWall(x, y, South);
 					}
 				}
@@ -123,7 +128,7 @@ public class ProbabilisticWallGrid {
 					if (wallExists(x, y, West)) {
 						mw.addWall(x, y, West);
 					}
-					else {
+					else if (!isOutsideWall(x, y, West)) {
 						mw.removeWall(x, y, West);
 					}
 				}
@@ -133,7 +138,7 @@ public class ProbabilisticWallGrid {
 						if (wallExists(x, y, North)) {
 							mw.addWall(x, y, North);
 						}
-						else {
+						else if (!isOutsideWall(x, y, North)) {
 							mw.removeWall(x, y, North);
 						}
 					}
@@ -143,13 +148,26 @@ public class ProbabilisticWallGrid {
 						if (wallExists(x, y, East)) {
 							mw.addWall(x, y, East);
 						}
-						else {
+						else if (!isOutsideWall(x, y, East)) {
 							mw.removeWall(x, y, East);
 						}
 					}
 				}
 			}
 		}
+	}
+	
+	public boolean isOutsideWall(int cellX, int cellY, Direction direction) {
+		if (cellY == 0 && direction == South)
+			return true;
+		if (cellY == mazeHeight && direction == North)
+			return true;
+		if (cellX == 0 && direction == West)
+			return true;
+		if (cellX == mazeWidth && direction == East)
+			return true;
+		
+		return false;
 	}
 
 	// Constructs a 2 by 2 grid, puts two misses on every wall

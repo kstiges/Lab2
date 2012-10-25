@@ -47,6 +47,7 @@ import edu.cmu.ri.mrpl.util.Lookahead;
 import edu.cmu.ri.mrpl.util.RingBuffer;
 import edu.cmu.ri.mrpl.util.GradientDescent.ErrorFunction;
 import static java.lang.Math.*;
+import static edu.cmu.ri.mrpl.RobotModel.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
 
@@ -380,14 +381,14 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				String mazeFileName = chooser.getSelectedFile().getAbsolutePath();
 				System.out.println("You chose to open this file: " + mazeFileName);
 				
-				try {
+				/*try {
 					MazeWorld world = new MazeWorld(mazeFileName);
 					java.util.List<RealPose2D> poses;
 					List<MazeState> states = new MazeSolver(world).findPath();
 					String commands = MazeSolver.statesToCommandsString(states);
 					System.out.println(commands);
 					poses = MazeLocalizer.statesToPoses(states);
-					
+
 					// get initial heading correct
 					int i = 0;
 					double theta = 0;
@@ -427,11 +428,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					}
 					upcomingTasks.add(new TurnToTask(this, Angle.normalize(theta)));
 					//*/
-					
+				/*	
 					startUpcomingTasks();
 				} catch (IOException e1) {
 					e1.printStackTrace();
-				}
+				}*/
+				upcomingTasks.add(new SolveMazeTask(this, 0.1, mazeFileName));
+				startUpcomingTasks();	
 			}
 		}
 	}
@@ -1231,7 +1234,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		ProbabilisticWallGrid pwg;
 		
 		private final double LOOKAHEAD_DISTANCE = 0.6;
-
+		private final double WALL_METERS = MazeLocalizer.WALL_METERS;
 		private static final boolean USE_SONARS = true;
 		
 		private TaskController tc;
@@ -1250,10 +1253,29 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			mazeGraphics = new MazeGraphics(mazeWorld);
 			pwg = new ProbabilisticWallGrid(mazeWorld);
 			
-			java.util.List<RealPose2D> poses;
+			//java.util.List<RealPose2D> poses;
 			// TODO take explicit path rather than using MazeSolver
-			List<MazeState> states = new MazeSolver(mazeWorld).findPath();
-			poses = MazeLocalizer.statesToPoses(states);
+			// THIS TODO IS DONE
+			JFileChooser chooser = new JFileChooser();
+			int returnVal = chooser.showOpenDialog(null);
+			if(returnVal == JFileChooser.APPROVE_OPTION) {
+				System.out.println("You chose to open this file: " +
+						chooser.getSelectedFile().getName());
+			}
+
+			CommandSequence followPath = new CommandSequence();
+
+			try {
+				followPath.readFile(chooser.getSelectedFile().getPath());
+			} catch (IOException e) {
+				System.err.println("Couldn't read file");
+			}
+			
+			Path poses = null;
+			for (Command cmd : followPath) {
+				poses = ((Command.PathArgument) cmd.argument).path;
+			}
+			
 			setDesiredPath(poses, maxDeviation);
 			
 			// construct corrected localizer
@@ -1302,6 +1324,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			RingBuffer<Point2D> pointsBuffer;
 			RealPoint2D[] sonarPointsBuffer;
 			double[] directSonarReadings;
+			double[] lastSonarReadings;
 			
 			robot.updateState();
 			speech = new Speech();
@@ -1322,6 +1345,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				pointsBuffer = new RingBuffer<Point2D>(400);
 				sonarPointsBuffer = null;
 				directSonarReadings = new double[16];
+				lastSonarReadings = new double[16];
 			}
 			
 			java.util.List<ContRobot> list = Collections.synchronizedList(new ArrayList<ContRobot>()); 
@@ -1362,28 +1386,103 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					lastPollPosition = curPose;
 					
 					robot.getSonars(directSonarReadings);
+					lastSonarReadings = directSonarReadings;
 					sonarPointsBuffer = perceptor.getSonarObstacles();
 					for (int i=0; i<sonarPointsBuffer.length; i++) {
-						// only use the sonar readings that are within a certain distance
-						if (directSonarReadings[i] < 2.0 ) {
-							Point2D hitRelRobot = curPose.transform(sonarPointsBuffer[i], null);
-							Point2D hitRelMaze = correctedLocalizer.transformInitToWorld(hitRelRobot);
+						Point2D hitRelRobot = curPose.transform(sonarPointsBuffer[i], null);
+						Point2D hitRelMaze = correctedLocalizer.transformInitToWorld(hitRelRobot);
+						if(directSonarReadings[i] < 2.0)
 							pointsBuffer.add(hitRelMaze);
-							pwg.hitNearestWall(hitRelMaze);
+						// only use the sonar readings that are within a certain distance
+						if ((i==0 || i==4 || i==8 || i==12) && directSonarReadings[i] < 1.1*lastSonarReadings[i] && directSonarReadings[i] > .9*lastSonarReadings[i]) {							
+						//	pwg.hitNearestWall(hitRelMaze);
 							
-							/*
-							 * TODO: figure out how to find wall misses
-							 * I think it has to do with getting the current position of the robot,
-							 * calculating where the nearest possible walls are in every sonar direction,
-							 * then seeing if the hit from that sonar is farther than it should be
-							 * if the nearest possible wall were there.
-							 */
-							if (directSonarReadings[i] > MazeLocalizer.WALL_METERS) {
+							if ((directSonarReadings[i] + ROBOT_RADIUS) > MazeLocalizer.WALL_METERS) {
 								Point2D robotCell = MazeLocalizer.fromWorldToCell(curPose).getPosition();
 								double xCell = robotCell.getX();
 								double yCell = robotCell.getY();
 								int xRound = (int) round(robotCell.getX());
 								int yRound = (int) round(robotCell.getY());
+								
+								if (goingEast(curPose)) {
+									switch (i) {
+									case 0:
+										pwg.missWall(xRound, yRound, Direction.East);
+										//System.out.println("Missing east " + xRound + "," + yRound);
+										break;
+									case 4:
+										pwg.missWall(xRound, yRound, Direction.North);
+										//System.out.println("Missing north " + xRound + "," + yRound);
+										break;
+									case 8:
+										pwg.missWall(xRound, yRound, Direction.West);
+										//System.out.println("Missing west " + xRound + "," + yRound);
+										break;
+									case 12:
+										pwg.missWall(xRound, yRound, Direction.South);
+										//System.out.println("Missing south " + xRound + "," + yRound);
+										break;
+									}
+								} else if (goingNorth(curPose)) {
+									switch (i) {
+									case 0:
+										pwg.missWall(xRound, yRound, Direction.North);
+										//System.out.println("Missing north " + xRound + "," + yRound);
+										break;
+									case 4:
+										pwg.missWall(xRound, yRound, Direction.West);
+										//System.out.println("Missing west " + xRound + "," + yRound);
+										break;
+									case 8:
+										pwg.missWall(xRound, yRound, Direction.South);
+										//System.out.println("Missing south " + xRound + "," + yRound);
+										break;
+									case 12:
+										pwg.missWall(xRound, yRound, Direction.East);
+										//System.out.println("Missing east " + xRound + "," + yRound);
+										break;
+									}
+								} else if (goingWest(curPose)) {
+									switch (i) {
+									case 0:
+										pwg.missWall(xRound, yRound, Direction.West);
+										//System.out.println("Missing west " + xRound + "," + yRound);
+										break;
+									case 4:
+										pwg.missWall(xRound, yRound, Direction.South);
+										//System.out.println("Missing south " + xRound + "," + yRound);
+										break;
+									case 8:
+										pwg.missWall(xRound, yRound, Direction.East);
+										//System.out.println("Missing east " + xRound + "," + yRound);
+										break;
+									case 12:
+										pwg.missWall(xRound, yRound, Direction.North);
+										//System.out.println("Missing north " + xRound + "," + yRound);
+										break;
+									}
+								} else if (goingSouth(curPose)) {
+									switch (i) {
+									case 0:
+										pwg.missWall(xRound, yRound, Direction.South);
+										//System.out.println("Missing south " + xRound + "," + yRound);
+										break;
+									case 4:
+										pwg.missWall(xRound, yRound, Direction.East);
+										//System.out.println("Missing east " + xRound + "," + yRound);
+										break;
+									case 8:
+										pwg.missWall(xRound, yRound, Direction.North);
+										//System.out.println("Missing north " + xRound + "," + yRound);
+										break;
+									case 12:
+										pwg.missWall(xRound, yRound, Direction.West);
+										//System.out.println("Missing west " + xRound + "," + yRound);
+										break;
+									}
+								}
+							
+								/*
 								double neCornerAngle = atan2(yRound + 0.5 - yCell, xRound + 0.5 - xCell);
 								double nwCornerAngle = atan2(yRound + 0.5 - yCell, xRound - 0.5 - xCell);
 								double swCornerAngle = atan2(yRound - 0.5 - yCell, xRound - 0.5 - xCell);
@@ -1393,22 +1492,30 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 								// east wall
 								if (seCornerAngle < sonarAngle && sonarAngle < neCornerAngle) {
 									pwg.missWall(xRound, yRound, Direction.East);
+									System.out.println("Missing east");
 								}
 								// north wall
 								else if (neCornerAngle < sonarAngle && sonarAngle < nwCornerAngle) {
 									pwg.missWall(xRound, yRound, Direction.North);
+									System.out.println("Missing north");
 								}
 								// west wall
 								// note that we use || instead of && here, due to angles being within +/- pi
 								else if (nwCornerAngle < sonarAngle || sonarAngle < swCornerAngle) {
 									pwg.missWall(xRound, yRound, Direction.West);
+									System.out.println("Missing west");
 								}
 								// south wall
-								else /*if (swCornerAngle < sonarAngle && sonarAngle < seCornerAngle)*/ {
+								else /*if (swCornerAngle < sonarAngle && sonarAngle < seCornerAngle)/ {
 									pwg.missWall(xRound, yRound, Direction.South);
-								}
+									System.out.println("Missing south");
+								}*/
+							} else if (!(Math.abs(hitRelMaze.getX()-WALL_METERS*(round(hitRelMaze.getX()/WALL_METERS))) < .1*WALL_METERS && Math.abs(hitRelMaze.getY()-WALL_METERS*(round(hitRelMaze.getY()/WALL_METERS))) < .1*WALL_METERS)){
+								pwg.hitNearestWall(hitRelMaze);
 							}
 						}
+						
+						lastSonarReadings[i] = directSonarReadings[i];
 					}
 					
 					// update the maze walls on the display
@@ -1517,6 +1624,34 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			if (USE_SONARS) {
 				robot.turnSonarsOff();
 			}
+		}
+		
+		public final boolean goingEast(RealPose2D curPose) {
+			if (Math.abs(Angle.normalize(curPose.getRotateTheta())) < Math.PI/8)
+				return true;
+			else
+				return false;
+		}
+		
+		public final boolean goingNorth(RealPose2D curPose) {
+			if (Angle.normalize(curPose.getRotateTheta()) > 3*Math.PI/8 && Angle.normalize(curPose.getRotateTheta()) < 5*Math.PI/8)
+				return true;
+			else
+				return false;
+		}
+		
+		public final boolean goingWest(RealPose2D curPose) {
+			if (Math.abs(Angle.normalize(curPose.getRotateTheta())) > 7*Math.PI/8)
+				return true;
+			else
+				return false;
+		}
+		
+		public final boolean goingSouth(RealPose2D curPose) {
+			if (Angle.normalize(curPose.getRotateTheta()) < -3*Math.PI/8 && Angle.normalize(curPose.getRotateTheta()) > -5*Math.PI/8)
+				return true;
+			else
+				return false;
 		}
 
 		public String toString() {
