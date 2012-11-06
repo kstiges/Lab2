@@ -3,9 +3,6 @@ package edu.cmu.ri.mrpl.maze;
 import java.awt.geom.Point2D;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Scanner;
-
-import javax.swing.text.Position;
 
 import edu.cmu.ri.mrpl.kinematics2D.Angle;
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
@@ -20,11 +17,13 @@ public class MazeLocalizer {
 	public static final double CELL_RADIUS = WALL_METERS / 2;
 	
 	private RealPose2D initRelWorld;
+	private MazeWorld maze;
 	
 	public MazeLocalizer (MazeWorld maze, boolean isWrong) {
 		initRelWorld = isWrong
 			? mazeStateToWorldPose(maze.getInits().iterator().next())
 			: new RealPose2D();
+		this.maze = maze;
 	}
 	
 	// given the pose of the robot relative to its origin,
@@ -97,26 +96,58 @@ public class MazeLocalizer {
 	}
 	
 	/*
-	public static void main (String... args) {
-		int[] coords = new int[]{
-				0,0,
-				5,0,
-				5,1,
-				2,1,
-				2,2,
-				1,2,
-				1,1,
-				0,1,
-				0,3,
-				5,3,
-				5,0,
-				0,0
-		};
+	 * Given a point relative to the maze frame (origin at southwest corner),
+	 * returns a MazeState representing the nearest wall.
+	 * This MazeState can be used with ProbabilisticWallGrid.hitWall to associate sonar hits.
+	 */
+	public static MazeState getClosestWall (Point2D hitRelMaze, int width, int height) {
+		double x = hitRelMaze.getX();
+		double y = hitRelMaze.getY();
 		
-		for (int i = 0; i < coords.length; i += 2) {
-			RealPose2D pose = mazeStateToWorldPose(new MazeState(coords[i], coords[i+1], Direction.East));
-			System.out.printf("%f,%f,%f;", pose.getX()-CELL_RADIUS, pose.getY()-CELL_RADIUS, pose.getTh());
+		int col = (int) floor(x / WALL_METERS);
+		// clamp to maze
+		col = max(col, 0);
+		col = min(col, width-1);
+		
+		int row = (int) floor(y / WALL_METERS);
+		// clamp to maze
+		row = max(row, 0);
+		row = min(row, height-1);
+		
+		double xClosestWall = round(x / WALL_METERS) * WALL_METERS;
+		double yClosestWall = round(y / WALL_METERS) * WALL_METERS;
+		
+		double xDist = abs(x - xClosestWall);
+		double yDist = abs(y - yClosestWall);
+		
+		boolean isVertical = xDist < yDist;
+		boolean isEast = x - col*WALL_METERS > CELL_RADIUS;
+		boolean isNorth = y - row*WALL_METERS > CELL_RADIUS;
+		
+		Direction dir = isVertical
+				? (isEast ? Direction.East : Direction.West)
+				: (isNorth ? Direction.North : Direction.South);
+		
+		return new MazeState(col, row, dir);
+	}
+	
+	
+	public static void main (String... args) {
+		int width = 6;
+		int height = 4;
+		
+		for (int i = 0; i < 10; i++) {
+			double cellX = random()*width;
+			double cellY = random()*height;
+			
+			double hitX = cellX * WALL_METERS;
+			double hitY = cellY * WALL_METERS;
+			
+			Point2D hit = new Point2D.Double(hitX, hitY);
+			
+			System.out.printf("cell coords: (%.2f, %.2f)\n", cellX, cellY);
+			System.out.println(getClosestWall(hit, width, height));
+			System.out.println();
 		}
 	}
-	*/
 }
