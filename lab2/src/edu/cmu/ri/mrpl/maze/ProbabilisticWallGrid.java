@@ -14,7 +14,7 @@ public class ProbabilisticWallGrid {
 
 	// To be said to exist, a wall must have at least this probability of existence.
 	// Adjust this as needed.
-	private static final double EXIST_PROB_THRESHOLD = 0.85;
+	private static final double EXIST_PROB_THRESHOLD = 0.75;
 
 	// Constructs a wall grid for a maze of given width/height
 	public ProbabilisticWallGrid (int width, int height) {		
@@ -71,8 +71,8 @@ public class ProbabilisticWallGrid {
 	public double getWallProbability (int cellX, int cellY, Direction wallDirection) {
 		int hits = getWallHits(cellX, cellY, wallDirection);
 		int total = getWallTotal(cellX, cellY, wallDirection);
-		// assume walls that have no hits or misses don't exist
-		if (total == 0) {
+		// assume walls that have few hits or misses don't exist
+		if (total < 5) {
 			return -1;
 		}
 		return (double) hits / total;
@@ -106,55 +106,51 @@ public class ProbabilisticWallGrid {
 		return null;
 	}
 	
+	private boolean updateMazeWorldWall (MazeWorld mw, int x, int y, Direction d) {
+		boolean changed = false;
+		if (getWallProbability(x, y, d) < 0) {
+			return false;
+		}
+		if (wallExists(x, y, d)) {
+			if (!mw.isWall(x, y, d)) {
+				changed = true;
+			}
+			mw.addWall(x, y, d);
+		}
+		else if (!isOutsideWall(x, y, d)) {
+			if (mw.isWall(x, y, d)) {
+				changed = true;
+			}
+			mw.removeWall(x, y, d);
+		}
+		return changed;
+	}
+	
 	// Constructs a MazeWorld with walls where they are according to the grid.
-	public void updateMazeWorld (MazeWorld mw) {
+	// returns whether the world changed
+	public boolean updateMazeWorld (MazeWorld mw) {
 		int width = mw.getWidth();
 		int height = mw.getHeight();
 		
 		//mw.removeAllWalls();
 		
+		boolean changed = false;
+		
 		for (int y = 0; y < height; y++) {
 			for (int x = 0; x < width; x++) {
-				if (getWallProbability(x, y, South) >= 0) {
-					if (wallExists(x, y, South)) {
-						mw.addWall(x, y, South);
-					}
-					else if (!isOutsideWall(x, y, South)) {
-						mw.removeWall(x, y, South);
-					}
-				}
-
-				if (getWallProbability(x, y, West) >= 0) {
-					if (wallExists(x, y, West)) {
-						mw.addWall(x, y, West);
-					}
-					else if (!isOutsideWall(x, y, West)) {
-						mw.removeWall(x, y, West);
-					}
-				}
+				changed |= updateMazeWorldWall(mw, x, y, South);
+				changed |= updateMazeWorldWall(mw, x, y, West);
 				
 				if (y == height - 1) {
-					if (getWallProbability(x, y, North) >= 0) {
-						if (wallExists(x, y, North)) {
-							mw.addWall(x, y, North);
-						}
-						else if (!isOutsideWall(x, y, North)) {
-							mw.removeWall(x, y, North);
-						}
-					}
+					changed |= updateMazeWorldWall(mw, x, y, North);
 				}
 				if (x == width - 1) {
-					if (getWallProbability(x, y, East) >= 0) {
-						if (wallExists(x, y, East)) {
-							mw.addWall(x, y, East);
-						}
-						else if (!isOutsideWall(x, y, East)) {
-							mw.removeWall(x, y, East);
-						}
-					}
+					changed |= updateMazeWorldWall(mw, x, y, East);
 				}
 			}
 		}
+		
+		return changed;
 	}
 	
 	public boolean isOutsideWall(int cellX, int cellY, Direction direction) {
@@ -199,10 +195,12 @@ public class ProbabilisticWallGrid {
 		for (int x = 0; x < size; x++) {
 			for (int y = 0; y < size; y++) {
 				for (int d = 0; d < 4; d++) {
-					int hits = pwg.getWallHits(x,y,Direction.values()[d]);
-					int total = pwg.getWallTotal(x,y,Direction.values()[d]);
-					boolean isWall = pwg.wallExists(x,y,Direction.values()[d]);
-					System.out.printf("(%d,%d,%d): %d/%d, %b\n", x, y, d, hits, total, isWall);
+					Direction dir = Direction.values()[d];
+					int hits = pwg.getWallHits(x,y,dir);
+					int total = pwg.getWallTotal(x,y,dir);
+					double prob = pwg.getWallProbability(x, y, dir);
+					boolean isWall = pwg.wallExists(x,y,dir);
+					System.out.printf("(%d,%d,%d): %d/%d, %.2f, %b\n", x, y, d, hits, total, prob, isWall);
 				}
 				System.out.println();
 			}

@@ -38,8 +38,6 @@ import edu.cmu.ri.mrpl.maze.MazeRobot;
 import edu.cmu.ri.mrpl.maze.MazeSolver;
 import edu.cmu.ri.mrpl.maze.MazeState;
 import edu.cmu.ri.mrpl.maze.MazeWorld;
-import edu.cmu.ri.mrpl.maze.MazeWorld.Direction;
-import edu.cmu.ri.mrpl.maze.ProbabilisticWallGrid;
 import edu.cmu.ri.mrpl.util.AngleMath;
 import edu.cmu.ri.mrpl.util.GradientDescent;
 import edu.cmu.ri.mrpl.util.GradientDescent.WallPointFitter;
@@ -47,7 +45,6 @@ import edu.cmu.ri.mrpl.util.Lookahead;
 import edu.cmu.ri.mrpl.util.RingBuffer;
 import edu.cmu.ri.mrpl.util.GradientDescent.ErrorFunction;
 import static java.lang.Math.*;
-import static edu.cmu.ri.mrpl.RobotModel.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
 
@@ -381,14 +378,14 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				String mazeFileName = chooser.getSelectedFile().getAbsolutePath();
 				System.out.println("You chose to open this file: " + mazeFileName);
 				
-				/*try {
+				try {
 					MazeWorld world = new MazeWorld(mazeFileName);
 					java.util.List<RealPose2D> poses;
 					List<MazeState> states = new MazeSolver(world).findPath();
 					String commands = MazeSolver.statesToCommandsString(states);
 					System.out.println(commands);
 					poses = MazeLocalizer.statesToPoses(states);
-
+					
 					// get initial heading correct
 					int i = 0;
 					double theta = 0;
@@ -428,13 +425,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					}
 					upcomingTasks.add(new TurnToTask(this, Angle.normalize(theta)));
 					//*/
-				/*	
+					
 					startUpcomingTasks();
 				} catch (IOException e1) {
+					// TODO Auto-generated catch block
 					e1.printStackTrace();
-				}*/
-				upcomingTasks.add(new SolveMazeTask(this, 0.1, mazeFileName));
-				startUpcomingTasks();	
+				}
 			}
 		}
 	}
@@ -950,7 +946,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			// construct list of line segments
 			pathSegments = Lookahead.posesToPath(poses);
-			//System.err.println(desiredPath.size() + " PATH SEGMENTS");
+			System.err.println(desiredPath.size() + " PATH SEGMENTS");
 		}
 
 		// setDesiredPath should be called before calling this method
@@ -1231,15 +1227,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		MazeRobot mazeRobot;
 		JFrame wrapper;
 		
-		ProbabilisticWallGrid pwg;
-		
 		private final double LOOKAHEAD_DISTANCE = 0.6;
-		private final double WALL_METERS = MazeLocalizer.WALL_METERS;
+
 		private static final boolean USE_SONARS = true;
 		
 		private TaskController tc;
-		
-		MazeState init;
 
 		SolveMazeTask(TaskController tc, double maxDeviation, String mazeFileName) {
 			super(tc);
@@ -1251,37 +1243,16 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				System.err.println("Couldn't read maze file!");
 			}
 			mazeGraphics = new MazeGraphics(mazeWorld);
-			pwg = new ProbabilisticWallGrid(mazeWorld);
 			
-			//java.util.List<RealPose2D> poses;
-			// TODO take explicit path rather than using MazeSolver
-			// THIS TODO IS DONE
-			JFileChooser chooser = new JFileChooser();
-			int returnVal = chooser.showOpenDialog(null);
-			if(returnVal == JFileChooser.APPROVE_OPTION) {
-				System.out.println("You chose to open this file: " +
-						chooser.getSelectedFile().getName());
-			}
-
-			CommandSequence followPath = new CommandSequence();
-
-			try {
-				followPath.readFile(chooser.getSelectedFile().getPath());
-			} catch (IOException e) {
-				System.err.println("Couldn't read file");
-			}
-			
-			Path poses = null;
-			for (Command cmd : followPath) {
-				poses = ((Command.PathArgument) cmd.argument).path;
-			}
-			
+			java.util.List<RealPose2D> poses;
+			List<MazeState> states = new MazeSolver(mazeWorld).findPath();
+			poses = MazeLocalizer.statesToPoses(states);
 			setDesiredPath(poses, maxDeviation);
 			
 			// construct corrected localizer
 			correctedLocalizer = new MazeLocalizer(mazeWorld, false);
 			// save init
-			init = mazeWorld.getInits().iterator().next();
+			MazeState init = mazeWorld.getInits().iterator().next();
 			
 			if (!USE_SONARS) {
 				mazeWorld.removeAllInits();
@@ -1317,14 +1288,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			// construct list of line segments
 			pathSegments = Lookahead.posesToPath(poses);
-			//System.err.println(desiredPath.size() + " PATH SEGMENTS");
+			System.err.println(desiredPath.size() + " PATH SEGMENTS");
 		}
 
 		public void taskRun() {
 			RingBuffer<Point2D> pointsBuffer;
 			RealPoint2D[] sonarPointsBuffer;
 			double[] directSonarReadings;
-			double[] lastSonarReadings;
 			
 			robot.updateState();
 			speech = new Speech();
@@ -1345,7 +1315,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				pointsBuffer = new RingBuffer<Point2D>(400);
 				sonarPointsBuffer = null;
 				directSonarReadings = new double[16];
-				lastSonarReadings = new double[16];
 			}
 			
 			java.util.List<ContRobot> list = Collections.synchronizedList(new ArrayList<ContRobot>()); 
@@ -1360,7 +1329,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			// TODO: Look at my comment below using this same garbage...
 			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - .3683, perceptor.getCorrectedPose().getY() - .3683, perceptor.getCorrectedPose().getTh());
-			//RealPose2D correctedPoseRelStart = RealPose2D.multiply(MazeLocalizer.mazeStateToWorldPose(init).inverse(), perceptor.getCorrectedPose());
 			
 			RealPose2D lastPollPosition = perceptor.getCorrectedPose();
 			RealPose2D lastGradientPosition = perceptor.getCorrectedPose();
@@ -1386,112 +1354,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					lastPollPosition = curPose;
 					
 					robot.getSonars(directSonarReadings);
-					lastSonarReadings = directSonarReadings;
 					sonarPointsBuffer = perceptor.getSonarObstacles();
 					for (int i=0; i<sonarPointsBuffer.length; i++) {
-						Point2D hitRelRobot = curPose.transform(sonarPointsBuffer[i], null);
-						Point2D hitRelMaze = correctedLocalizer.transformInitToWorld(hitRelRobot);
-						if(directSonarReadings[i] < 2.0)
-							pointsBuffer.add(hitRelMaze);
 						// only use the sonar readings that are within a certain distance
-						if ((i==0 || i==4 || i==8 || i==12) && directSonarReadings[i] < 1.1*lastSonarReadings[i] && directSonarReadings[i] > .9*lastSonarReadings[i]) {							
-						//	pwg.hitNearestWall(hitRelMaze);
-							
-							
-							if ((directSonarReadings[i] + ROBOT_RADIUS) > MazeLocalizer.WALL_METERS) {
-								Point2D robotCell = MazeLocalizer.fromWorldToCell(curPose).getPosition();
-								double xCell = robotCell.getX();
-								double yCell = robotCell.getY();
-								int xRound = (int) round(robotCell.getX());
-								int yRound = (int) round(robotCell.getY());
-								
-								if (goingEast(curPose)) {
-									switch (i) {
-									case 0:
-										pwg.missWall(xRound, yRound, Direction.East);
-										//System.out.println("Missing east " + xRound + "," + yRound);
-										break;
-									case 4:
-										pwg.missWall(xRound, yRound, Direction.North);
-										//System.out.println("Missing north " + xRound + "," + yRound);
-										break;
-									case 8:
-										pwg.missWall(xRound, yRound, Direction.West);
-										//System.out.println("Missing west " + xRound + "," + yRound);
-										break;
-									case 12:
-										pwg.missWall(xRound, yRound, Direction.South);
-										//System.out.println("Missing south " + xRound + "," + yRound);
-										break;
-									}
-								} else if (goingNorth(curPose)) {
-									switch (i) {
-									case 0:
-										pwg.missWall(xRound, yRound, Direction.North);
-										//System.out.println("Missing north " + xRound + "," + yRound);
-										break;
-									case 4:
-										pwg.missWall(xRound, yRound, Direction.West);
-										//System.out.println("Missing west " + xRound + "," + yRound);
-										break;
-									case 8:
-										pwg.missWall(xRound, yRound, Direction.South);
-										//System.out.println("Missing south " + xRound + "," + yRound);
-										break;
-									case 12:
-										pwg.missWall(xRound, yRound, Direction.East);
-										//System.out.println("Missing east " + xRound + "," + yRound);
-										break;
-									}
-								} else if (goingWest(curPose)) {
-									switch (i) {
-									case 0:
-										pwg.missWall(xRound, yRound, Direction.West);
-										//System.out.println("Missing west " + xRound + "," + yRound);
-										break;
-									case 4:
-										pwg.missWall(xRound, yRound, Direction.South);
-										//System.out.println("Missing south " + xRound + "," + yRound);
-										break;
-									case 8:
-										pwg.missWall(xRound, yRound, Direction.East);
-										//System.out.println("Missing east " + xRound + "," + yRound);
-										break;
-									case 12:
-										pwg.missWall(xRound, yRound, Direction.North);
-										//System.out.println("Missing north " + xRound + "," + yRound);
-										break;
-									}
-								} else if (goingSouth(curPose)) {
-									switch (i) {
-									case 0:
-										pwg.missWall(xRound, yRound, Direction.South);
-										//System.out.println("Missing south " + xRound + "," + yRound);
-										break;
-									case 4:
-										pwg.missWall(xRound, yRound, Direction.East);
-										//System.out.println("Missing east " + xRound + "," + yRound);
-										break;
-									case 8:
-										pwg.missWall(xRound, yRound, Direction.North);
-										//System.out.println("Missing north " + xRound + "," + yRound);
-										break;
-									case 12:
-										pwg.missWall(xRound, yRound, Direction.West);
-										//System.out.println("Missing west " + xRound + "," + yRound);
-										break;
-									}
-								}
-							} else if (!(Math.abs(hitRelMaze.getX()-WALL_METERS*(round(hitRelMaze.getX()/WALL_METERS))) < .1*WALL_METERS && Math.abs(hitRelMaze.getY()-WALL_METERS*(round(hitRelMaze.getY()/WALL_METERS))) < .1*WALL_METERS)){
-								pwg.hitNearestWall(hitRelMaze);
-							}
+						if (directSonarReadings[i] < 2.0 ) {
+							pointsBuffer.add(correctedLocalizer.transformInitToWorld(perceptor.getCorrectedPose().transform(sonarPointsBuffer[i], null)));
 						}
-						
-						lastSonarReadings[i] = directSonarReadings[i];
 					}
-					
-					// update the maze walls on the display
-					pwg.updateMazeWorld(mazeWorld);
 				}
 				
 				// Every interval (.25 meters) do this
@@ -1550,7 +1419,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				// It's late and I can't wrap my brain around the needed transform so I just did this and it seems to work except the robot has become "sloppy" now
 				// instead of the nice smooth runs we had in Lab 4
 				correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - .3683, perceptor.getCorrectedPose().getY() - .3683, perceptor.getCorrectedPose().getTh());
-				//correctedPoseRelStart = RealPose2D.multiply(MazeLocalizer.mazeStateToWorldPose(init).inverse(), perceptor.getCorrectedPose());
 
 				segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
 				destPointRelCur = correctedPoseRelStart.inverseTransform(tmp, null);
@@ -1572,11 +1440,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						double targetTheta = desiredPath.get(desiredPath.size() - 1).getTh();
 						double curTheta = correctedPoseRelStart.getTh();
 						double dTheta = Angle.normalize(targetTheta - curTheta);
-						/*
 						System.out.println(targetTheta);
 						System.out.println(curTheta);
 						System.out.println(dTheta);
-						*/
 						upcomingTasks.add(0, new TurnToTask(tc, dTheta));
 						break;
 					}
@@ -1596,34 +1462,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			if (USE_SONARS) {
 				robot.turnSonarsOff();
 			}
-		}
-		
-		public final boolean goingEast(RealPose2D curPose) {
-			if (Math.abs(Angle.normalize(curPose.getRotateTheta())) < Math.PI/8)
-				return true;
-			else
-				return false;
-		}
-		
-		public final boolean goingNorth(RealPose2D curPose) {
-			if (Angle.normalize(curPose.getRotateTheta()) > 3*Math.PI/8 && Angle.normalize(curPose.getRotateTheta()) < 5*Math.PI/8)
-				return true;
-			else
-				return false;
-		}
-		
-		public final boolean goingWest(RealPose2D curPose) {
-			if (Math.abs(Angle.normalize(curPose.getRotateTheta())) > 7*Math.PI/8)
-				return true;
-			else
-				return false;
-		}
-		
-		public final boolean goingSouth(RealPose2D curPose) {
-			if (Angle.normalize(curPose.getRotateTheta()) < -3*Math.PI/8 && Angle.normalize(curPose.getRotateTheta()) > -5*Math.PI/8)
-				return true;
-			else
-				return false;
 		}
 
 		public String toString() {
