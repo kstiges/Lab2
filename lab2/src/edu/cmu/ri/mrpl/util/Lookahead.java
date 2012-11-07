@@ -42,6 +42,10 @@ public class Lookahead {
 		//*/
 	}
 	
+	public static void zeroCurrentSegment() {
+		currentSegment = 0;
+	}
+	
 	public static List<Line2D> posesToPath (List<RealPose2D> poses) {
 		List<Line2D> pathSegments = new ArrayList<Line2D>();
 		for (int i = 1; i < poses.size(); i++) {

@@ -23,6 +23,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
+import java.awt.image.BufferedImage;
 
 import javax.swing.*;
 
@@ -39,6 +40,7 @@ import edu.cmu.ri.mrpl.maze.MazeRobot;
 import edu.cmu.ri.mrpl.maze.MazeSolver;
 import edu.cmu.ri.mrpl.maze.MazeState;
 import edu.cmu.ri.mrpl.maze.MazeWorld;
+import edu.cmu.ri.mrpl.usbCamera.PicCanvas;
 import edu.cmu.ri.mrpl.usbCamera.UsbCamera;
 import edu.cmu.ri.mrpl.util.AngleMath;
 import edu.cmu.ri.mrpl.util.GradientDescent;
@@ -85,9 +87,26 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	final double SPEED_TOLERANCE = 0.01;
 
 	private Task curTask = null;
+	
+	JFrame cameraFrame;
+	JFrame feedbackFrame;
+	PicCanvas cameraCanvas;
+	PicCanvas feedbackCanvas;
 
 	public SampleRobotApp() {
 		super("Kick Ass Sample Robot App");
+		
+		cameraFrame = new JFrame("Camera");
+		cameraCanvas = new PicCanvas();
+		cameraFrame.getContentPane().add(cameraCanvas, BorderLayout.CENTER);
+		cameraFrame.setSize(UsbCamera.XSIZE, UsbCamera.YSIZE);
+		cameraFrame.setVisible(true);
+
+		feedbackFrame = new JFrame("Feedback");
+		feedbackCanvas = new PicCanvas();
+		feedbackFrame.getContentPane().add(feedbackCanvas, BorderLayout.CENTER);
+		feedbackFrame.setSize(UsbCamera.XSIZE, UsbCamera.YSIZE);
+		feedbackFrame.setVisible(true);
 
 		upcomingTasks = new LinkedList<Task>();
 
@@ -344,8 +363,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		} else if ( source==quitButton ) {
 			quit();
 		} else if ( source==pauseButton ) {
-			upcomingTasks.add(new PauseTask(this));
-			startUpcomingTasks();
+//			upcomingTasks.add(new PauseTask(this));
+//			startUpcomingTasks();
+			UsbCamera cam = UsbCamera.getInstance();
+			
+			System.out.println("blue: "+checkForBlue(cam));
 		} else if ( source==waitButton ) {
 			upcomingTasks.add(new WaitTask(this, argument));
 			startUpcomingTasks();
@@ -951,6 +973,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			// construct list of line segments
 			pathSegments = Lookahead.posesToPath(poses);
+			Lookahead.zeroCurrentSegment();
 			System.err.println(desiredPath.size() + " PATH SEGMENTS");
 		}
 
@@ -1687,20 +1710,46 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			robotStartedHere = curPose;
 			curPoseRelStart = perceptor.getRelPose(robotStartedHere);
 			lastPoseRelStart = curPoseRelStart;
+			
 			double curTime = System.nanoTime();
 			lastTime = curTime;
 			destPointRelStart = new Point2D.Double(xOffset, 0);
 		}
 		
 		private void goTo() {
-			final double Kp = 1.5;
+			
+			final double Kp = 0.5;
 			final double Kd = 15;
 			lastPoseRelStart = curPoseRelStart;
 			lastTime = curTime;
 			curPoseRelStart = perceptor.getRelPose(robotStartedHere);
 			curTime = System.currentTimeMillis();
 			double distanceErr = destPointRelStart.getX() - curPoseRelStart.getX();
+			
+			final double DISTANCE_TOLERANCE = 0.005;
+			final double SPEED_TOLERANCE = 0.01;
 
+			// transition to next state
+			if (abs(distanceErr) < DISTANCE_TOLERANCE
+						&& abs(robot.getVelLeft()) < SPEED_TOLERANCE) {
+				controller.stop();
+				// transition to next state
+				if (perceptor.getSpeed() == 0) {
+					switch (curSubtask) {
+					case GOTO_GOLD_WALL:
+						setupGotoHelper(-IDEAL_GOLD_OFFSET/2);
+						transitionTo(Subtask.GO_FROM_GOLD_WALL);
+						break;
+								
+					case GO_FROM_GOLD_WALL:
+						destAngle = Angle.normalize(curPose.getTh() + PI/2);
+						transitionTo(Subtask.TURNTO_GOLD_CHECK);
+						break;
+					}
+					return;
+				}
+			}
+			
 			double distanceTraveled = curPoseRelStart.getX() - lastPoseRelStart.getX();
 			boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
 
@@ -1712,17 +1761,17 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
 			double u = pterm + dterm;
 			double speed = u;
+			if(speed > 0.1) //cap the speed since were going short distance
+				speed = 0.1;
 			controller.setVel(speed, speed);
-			
-			final double DISTANCE_TOLERANCE = 0.005;
-			final double SPEED_TOLERANCE = 0.01;
 
+			/*
 			// transition to next state
 			if (abs(distanceErr) < DISTANCE_TOLERANCE
 							&& abs(robot.getVelLeft()) < SPEED_TOLERANCE) {
 				switch (curSubtask) {
 				case GOTO_GOLD_WALL:
-					setupGotoHelper(-IDEAL_GOLD_OFFSET);
+					setupGotoHelper(-IDEAL_GOLD_OFFSET/2);
 					transitionTo(Subtask.GO_FROM_GOLD_WALL);
 					break;
 					
@@ -1732,6 +1781,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					break;
 				}
 			}
+			*/
 		}
 		
 		private void turnTo () {
@@ -1763,15 +1813,22 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						
 					case TURNTO_GOLD:
 						RealPose2D goalPose = MazeLocalizer.mazeStateToWorldPose(goalState);
-						Point2D idealGoalPoint = goalPose.inverseTransform(new Point2D.Double(IDEAL_GOLD_OFFSET, 0), null);
+						Point2D idealGoalPoint = goalPose.inverseTransform(new Point2D.Double(IDEAL_GOLD_OFFSET/2, 0), null);
 						double actualOffset = curPose.transform(idealGoalPoint, null).getX();
 						setupGotoHelper(actualOffset);
-						transitionTo(Subtask.GOTO_GOLD_WALL);
+						if(checkForBlue(cam))
+							transitionTo(Subtask.GOTO_GOLD_WALL);
+						else
+						{
+							mazeWorld.removeGold(goalState);
+							transitionTo(Subtask.START);
+						}
 						break;
 						
 					case TURNTO_GOLD_CHECK:
 						if (checkForBlue(cam)) {
 							hasGold = true;
+							mazeWorld.removeGold(goalState);
 							setupPathHelper();
 						}
 						else {
@@ -1803,14 +1860,15 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void followPath() {
-			final double Kp = 2;
+			final double Kp = 1.25;// was 2
 			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
 			RealPoint2D tmp = new RealPoint2D();
 			int segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
 			Point2D destPointRelCur = correctedPoseRelStart.inverseTransform(tmp, null);
 			// transition to something if we're approaching the end of the path
 			if (segment == pathSegments.size() - 1
-					&& destPointRelCur.distance(new Point2D.Double()) < 0.4) {
+					&& destPointRelCur.distance(new Point2D.Double()) < perceptor.getSpeed()
+					|| destPointRelCur.distance(new Point2D.Double()) < 0.07) {
 				controller.stop();
 				if (perceptor.getSpeed() == 0) {
 					// same conversation as MazeLocalizer.mazeStateToWorldPose
@@ -1887,13 +1945,18 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 	}
 	
+	private boolean isPixelBlue (int[] pixel) {
+		int red = pixel[UsbCamera.RED];
+		int blue = pixel[UsbCamera.BLUE];
+		int green = pixel[UsbCamera.GREEN];
+		
+		int margin = 0;
+		
+		return (blue - margin > red) && (blue - margin > green);
+	}
+	
 	public boolean checkForBlue(UsbCamera cam)
 	{
-		/*UsbCamera cam = UsbCamera.getInstance();
-		PicCanvas canvas = new PicCanvas();
-		getContentPane().add(canvas, BorderLayout.CENTER);
-		this.setSize(UsbCamera.XSIZE, UsbCamera.YSIZE);*/
-		
 		/* Display the window */
 		int xSize = cam.getXSize();
 		int ySize = cam.getYSize();
@@ -1901,88 +1964,49 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		int goldSum = 0;
 		int sum = 0;
 		
-		double rAverage = 0;
-		double bAverage = 0;
-		double gAverage = 0;
-		double rTotal = 0;
-		double bTotal = 0;
-		double gTotal = 0;
+		cam.snap();
+		cam.snap();
 		
-		double rTolerance = 0.24;
-		double bTolerance = 0.40;
-		double gTolerance = 0.18;
-			
-		//for(int i = 0; i < 4; i++)
-		//{
-			cam.snap();
-			//canvas.setImage(cam.getImage());
-			//canvas.setRect(25, 25, 10, 10);
-			
-			sum = 0;
-			goldSum = 0;
-			rAverage = 0;
-			bAverage = 0;
-			gAverage = 0;
-			rTotal = 0;
-			bTotal = 0;
-			gTotal = 0;
-			for(int j = 0; j < xSize; j++)
+		
+		BufferedImage feedbackImage = new BufferedImage(xSize, ySize, BufferedImage.TYPE_INT_RGB);
+		
+		for(int j = 0; j < xSize; j++)
+		{
+			for(int k = 0; k < ySize; k++)
 			{
-				for(int k = 0; k < ySize; k++)
+				int[] pixel = cam.getPixel(j, k);
+				double nr = ((double)pixel[UsbCamera.RED])/(pixel[UsbCamera.RED] + pixel[UsbCamera.BLUE] + pixel[UsbCamera.GREEN]);
+				double nb = ((double)pixel[UsbCamera.BLUE])/(pixel[UsbCamera.RED] + pixel[UsbCamera.BLUE] + pixel[UsbCamera.GREEN]);
+				double ng = ((double)pixel[UsbCamera.GREEN])/(pixel[UsbCamera.RED] + pixel[UsbCamera.BLUE] + pixel[UsbCamera.GREEN]);
+				
+				sum++;
+				//if(.236 < nr && nr < .359 && .312 < ng && ng < .367)
+				if (isPixelBlue(pixel))
 				{
-					int[] pixel = cam.getPixel(j, k);
-					double nr = ((double)pixel[UsbCamera.RED])/(pixel[UsbCamera.RED] + pixel[UsbCamera.BLUE] + pixel[UsbCamera.GREEN]);
-					double nb = ((double)pixel[UsbCamera.BLUE])/(pixel[UsbCamera.RED] + pixel[UsbCamera.BLUE] + pixel[UsbCamera.GREEN]);
-					double ng = ((double)pixel[UsbCamera.GREEN])/(pixel[UsbCamera.RED] + pixel[UsbCamera.BLUE] + pixel[UsbCamera.GREEN]);
-					
-					/*sum++;
-					if(sum == 1)
-					{
-						rTotal = nr;
-						bTotal = nb;
-						gTotal = ng;
-						rAverage = nr;
-						bAverage = nb;
-						gAverage = ng;
-					}
-					else
-					{
-						if(abs(nr - rAverage) <= 0.015 &&
-								abs(nb - bAverage) <= 0.015 &&
-								abs(ng - gAverage) <= 0.015)
-							{
-								goldSum++;
-								rTotal += nr;
-								bTotal += nb;
-								gTotal += ng;
-								rAverage = rTotal/sum;
-								bAverage = bTotal/sum;
-								gAverage = gTotal/sum;
-							}
-					}*/
-					sum++;
-					if(abs(nr) <= rTolerance && abs(ng - 0.4) <= gTolerance)
-					{
-						goldSum++;
-						
-					}
-//					System.out.println(" r:"+pixel[UsbCamera.RED]+
-//							" g:"+pixel[UsbCamera.GREEN]+
-//							" b:"+pixel[UsbCamera.BLUE]);
-//					System.out.println("nr:" +nr+
-//							" ng:" +ng+
-//							" nb:" +nb);
+					goldSum++;
+					feedbackImage.setRGB(j,k,Integer.MAX_VALUE);
+				}
+				else {
+					feedbackImage.setRGB(j,k,0);
 				}
 			}
-			if((double)goldSum/sum > 0.55) {
-				System.out.println(/*i + */ ": yes & goldsum:"+goldSum+" sum:"+sum);
-				return true;
-			}
-			else {
-				System.out.println(/*i + */ ": no & goldsum:"+goldSum+" sum:"+sum);
-				return false;
-			}
-		//}
+		}
+		cameraCanvas.setImage(cam.getImage());
+		cameraCanvas.repaint();
+		cameraFrame.repaint();
+		
+		feedbackCanvas.setImage(feedbackImage);
+		feedbackCanvas.repaint();
+		feedbackFrame.repaint();
+		
+		if((double)goldSum/sum > 0.55) {
+			System.out.println(/*i + */ ": yes & goldsum:"+goldSum+" sum:"+sum);
+			return true;
+		}
+		else {
+			System.out.println(/*i + */ ": no & goldsum:"+goldSum+" sum:"+sum);
+			return false;
+		}
 	}
 	
 	private static final long serialVersionUID = 0;
