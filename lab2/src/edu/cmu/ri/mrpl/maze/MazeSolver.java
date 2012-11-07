@@ -9,6 +9,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 
 import javax.swing.JFileChooser;
 
@@ -29,7 +30,7 @@ public class MazeSolver {
 		parents = new HashMap<MazeState, MazeState>();
 	}
 	
-	public List<MazeState> findPath () {
+	public List<MazeState> findPath (boolean findGold) {
 		List<MazeState> result = new LinkedList<MazeState>();
 		
 		Queue<MazeState> toVisit = new LinkedList<MazeState>();
@@ -39,7 +40,7 @@ public class MazeSolver {
 			MazeState current = toVisit.remove();
 			visited.add(current);
 			// if this is a goal position
-			if (isGoalState(world, current)) {
+			if (isGoalState(world, current, findGold)) {
 				// extract path from ancestor map and return it
 				result.add(0, current);
 				while (parents.containsKey(current)) {
@@ -78,10 +79,16 @@ public class MazeSolver {
 		return null;
 	}
 
-	public static boolean isGoalState(MazeWorld mw, MazeState state)
+	public static boolean isGoalState(MazeWorld mw, MazeState state, boolean findGold)
 	{
-		Object[] goals = mw.getGoals().toArray();
-		for(Object o: goals)
+		Set<MazeState> goals;
+		if (findGold) {
+			goals = mw.getFreeGolds();
+		}
+		else {
+			goals = mw.getDrops();
+		}
+		for(MazeState o: goals)
 		{
 			MazeState ms = (MazeState) o;
 			if(ms.equals(state))
@@ -127,7 +134,8 @@ public class MazeSolver {
 			System.err.println("Couldn't read maze file!");
 		}
 
-		optimalPath = new MazeSolver(mazeWorld).findPath();
+		// TODO test with maze containing gold
+		optimalPath = new MazeSolver(mazeWorld).findPath(true);
 
 		for (MazeState s : optimalPath) {
 			System.out.println(s.pos());
