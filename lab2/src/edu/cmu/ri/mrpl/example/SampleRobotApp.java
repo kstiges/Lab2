@@ -34,10 +34,12 @@ import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
 import edu.cmu.ri.mrpl.maze.MazeGraphics;
 import edu.cmu.ri.mrpl.maze.MazeGraphics.ContRobot;
 import edu.cmu.ri.mrpl.maze.MazeLocalizer;
+import static edu.cmu.ri.mrpl.maze.MazeLocalizer.*;
 import edu.cmu.ri.mrpl.maze.MazeRobot;
 import edu.cmu.ri.mrpl.maze.MazeSolver;
 import edu.cmu.ri.mrpl.maze.MazeState;
 import edu.cmu.ri.mrpl.maze.MazeWorld;
+import edu.cmu.ri.mrpl.usbCamera.UsbCamera;
 import edu.cmu.ri.mrpl.util.AngleMath;
 import edu.cmu.ri.mrpl.util.GradientDescent;
 import edu.cmu.ri.mrpl.util.GradientDescent.WallPointFitter;
@@ -112,7 +114,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		quitButton = new JButton(">> quit <<");
 		executeButton = new JButton("Execute File");
 		loadMazeButton = new JButton("Load Maze File");
-		solveMazeButton = new JButton("Solve Maze");
+		solveMazeButton = new JButton("Michael Phelps");
 
 		connectButton.addActionListener(this);
 		disconnectButton.addActionListener(this);
@@ -380,11 +382,10 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				
 				try {
 					MazeWorld world = new MazeWorld(mazeFileName);
-//					java.util.List<RealPose2D> poses;
 					List<MazeState> states = new MazeSolver(world).findPath();
 					String commands = MazeSolver.statesToCommandsString(states);
 					System.out.println(commands);
-//					poses = MazeLocalizer.statesToPoses(states);
+					java.util.List<RealPose2D> poses = MazeLocalizer.statesToPoses(states);
 					
 					// get initial heading correct
 					int i = 0;
@@ -1330,7 +1331,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			RealPose2D curPose = perceptor.getCorrectedPose();
 			
 			// TODO: Look at my comment below using this same garbage...
-			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - .3683, perceptor.getCorrectedPose().getY() - .3683, perceptor.getCorrectedPose().getTh());
+			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
 			
 			RealPose2D lastPollPosition = perceptor.getCorrectedPose();
 			RealPose2D lastGradientPosition = perceptor.getCorrectedPose();
@@ -1420,7 +1421,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				// it should have been at 0,0 when it was saying .3683, .3683
 				// It's late and I can't wrap my brain around the needed transform so I just did this and it seems to work except the robot has become "sloppy" now
 				// instead of the nice smooth runs we had in Lab 4
-				correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - .3683, perceptor.getCorrectedPose().getY() - .3683, perceptor.getCorrectedPose().getTh());
+				correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
 
 				segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
 				destPointRelCur = correctedPoseRelStart.inverseTransform(tmp, null);
@@ -1476,47 +1477,58 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		GOTO_GOLD_CELL,
 		GOTO_GOLD_WALL, GO_FROM_GOLD_WALL,
 		GOTO_DROP_CELL, DROP_GOLD,
-		TURNTO
+		TURNTO_GOLD, TURNTO_GOLD_CHECK, TURNTO_PATH,
+		
+		END_TASK // used to end the overall Task
 	}
 	
 	// named so because it gets all the golds
 	class MichaelPhelpsTask extends Task {
-		RealPose2D robotStartedHere;
-		Controller controller;
-		Speech speech;
+		private RealPose2D robotStartedHere;
+		private Controller controller;
+		private Speech speech;
 
-		Perceptor perceptor;
-		MazeLocalizer correctedLocalizer;
-		MazeLocalizer rawLocalizer;
-		MazeWorld mazeWorld;
-		MazeGraphics mazeGraphics;
-		MazeRobot mazeRobot;
-		JFrame wrapper;
+		private Perceptor perceptor;
+		private MazeLocalizer correctedLocalizer;
+		private MazeLocalizer rawLocalizer;
+		private MazeWorld mazeWorld;
+		private MazeGraphics mazeGraphics;
+		private JFrame wrapper;
 		
-		private Subtask subtask = null;
-		private Subtask nextSubtask = Subtask.GOTO_GOLD_CELL;
+		private Subtask curSubtask = Subtask.GOTO_GOLD_CELL;
+		private Subtask nextSubtask = Subtask.TURNTO_GOLD;
 		
 		// used in Subtasks GOTO_GOLD_WALL, GO_FROM_GOLD_WALL
 		private RealPose2D desiredPose;
-		// used in Subtask TURN
-		private double desiredTheta;
+		// used in Subtask TURNTO
 		private boolean hasGold = false;
 		
 		// variables that are updated by the main taskRun loop before calling subtask methods
+		private RealPose2D curPose;
+		
+		// path following stuff
 		// used in Subtasks GOTO_GOLD_CELL, GOTO_DROP_CELL
-		ArrayList<RealPose2D> desiredPath;
-		java.util.List<Line2D> pathSegments;
-		double maxDeviation;
-		
-		RealPose2D curPose;
-		
-		RealPose2D lastPollPosition;
-		RealPose2D lastGradientPosition;
-		RingBuffer<Point2D> pointsBuffer;
-		
+		private ArrayList<RealPose2D> desiredPath;
+		private java.util.List<Line2D> pathSegments;
+		private double maxDeviation;
 		private static final double LOOKAHEAD_DISTANCE = 0.6;
+		
+		// turn to stuff
+		// used in Subtask TURNTO
+		private double curAngle;
+		private double lastAngle;
+		private double curTime;
+		private double lastTime;
+		private double destAngle;
+		private static final double ANGLE_TOLERANCE = 0.01;
+		private static final double SPEED_TOLERANCE = 0.01;
+		
+		// sonar localization stuff
+		private RealPose2D lastPollPosition;
 		private static final double POLL_INTERVAL = 0.01; // meters between polling the sonars
+		private RealPose2D lastGradientPosition;
 		private static final double GRADIENT_INTERVAL = .1; // meters between running gradient descent on points
+		private RingBuffer<Point2D> pointsBuffer;
 		
 		private TaskController tc;
 
@@ -1580,23 +1592,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			mazeGraphics.setContRobots(contBotList);
 			
 			curPose = perceptor.getCorrectedPose();
-			
-			// TODO: Look at my comment below using this same garbage...
-			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - .3683, perceptor.getCorrectedPose().getY() - .3683, perceptor.getCorrectedPose().getTh());
-			
-			lastPollPosition = perceptor.getCorrectedPose();
-			lastGradientPosition = perceptor.getCorrectedPose();
-			
-			RealPoint2D tmp = new RealPoint2D();
-			int segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
-			Point2D destPointRelCur = robotStartedHere.inverseTransform(tmp, null);
-						
-			double[] arcInfo = calculateArc(destPointRelCur);
-			double distanceErr = arcInfo[1];
-			
-			while(!shouldStop() &&
-					(abs(distanceErr) > DISTANCE_TOLERANCE
-							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
+			lastPollPosition = curPose;
+			lastGradientPosition = curPose;
+
+			// TODO change this to loop until out of golds
+			while (!shouldStop())
 			{
 				robot.updateState();
 				curPose = perceptor.getCorrectedPose();
@@ -1605,48 +1605,97 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				tryDescendPose();				
 				updateGraphics(contBotList);
 				
-				// TODO move remaining code in loop to subtask methods
-				
-				arcInfo = calculateArc(destPointRelCur);
-				// end of path
-				// transition to turnto
-				if (segment == pathSegments.size() - 1
-						&& destPointRelCur.distance(new Point2D.Double()) < 0.3) {
-					controller.setVel(0, 0);
-					if (perceptor.getSpeed() == 0) {
-						// XXX does this work?
-						double targetTheta = desiredPath.get(desiredPath.size() - 1).getTh();
-						double curTheta = correctedPoseRelStart.getTh();
-						double dTheta = Angle.normalize(targetTheta - curTheta);
-						System.out.println(targetTheta);
-						System.out.println(curTheta);
-						System.out.println(dTheta);
-						upcomingTasks.add(0, new TurnToTask(tc, dTheta));
-						break;
-					}
+				// end the task if requested
+				if (curSubtask == Subtask.END_TASK){
+					break;
 				}
-				else {
-					// follow path
-					double Kp = 2;
-					controller.setCurvVel(1.0/arcInfo[0], Kp*arcInfo[1]);
+				
+				switch (curSubtask) {
+				case GOTO_GOLD_CELL:
+				case GOTO_DROP_CELL:
+					followPath();
+					break;
+				
+				case TURNTO_GOLD:
+				case TURNTO_GOLD_CHECK:
+				case TURNTO_PATH:
+					turnTo();
+					break;
 				}
 				
 				try {
 					Thread.sleep(50);
 				} catch(InterruptedException iex) {
-					System.err.println("draw maze interrupted");
+					System.err.println("michael phelps interrupted");
 				}
 			}
 
 			remainingField.setText("");
 			robot.turnSonarsOff();
 		}
+		
+		private void turnTo () {
+			final double Kp = .4;
+			final double Kd = 95;
+			
+			lastAngle = curAngle;
+			lastTime = curTime;
+			curAngle = Angle.normalize(curPose.getTh());
+			//curTime = System.nanoTime();
+			curTime = System.currentTimeMillis();
+			double angleErr = Angle.normalize(destAngle - curAngle);
+
+			// transition to something if we're close enough
+			if (abs(angleErr) < ANGLE_TOLERANCE
+					&& abs(robot.getVelLeft()) < SPEED_TOLERANCE) {
+				controller.stop();
+				if (perceptor.getSpeed() == 0) {
+					// TODO transition to next subtask
+				}
+			}
+			else {
+				double angleTraveled = Angle.normalize(curAngle - lastAngle);
+				boolean progressMade = signum(angleTraveled) == signum(angleErr);
+	
+				double pterm = Kp*abs(angleErr);
+				double dterm = Kd*(abs(angleTraveled))/(curTime-lastTime);
+				if (progressMade) {
+					dterm *= -1;
+				}
+				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
+				double u = pterm + dterm;
+				double direction = signum(angleErr);
+				//System.err.println(angleErr + " off, speed = " + u*direction);
+				double speed = direction*u;
+				controller.setVel(-speed, speed);
+			}
+		}
+		
+		private void followPath () {
+			final double Kp = 2;
+			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
+			RealPoint2D tmp = new RealPoint2D();
+			int segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
+			Point2D destPointRelCur = correctedPoseRelStart.inverseTransform(tmp, null);
+			// transition to something if we're approaching the end of the path
+			if (segment == pathSegments.size() - 1
+					&& destPointRelCur.distance(new Point2D.Double()) < 0.4) {
+				controller.stop();
+				if (perceptor.getSpeed() == 0) {
+					// TODO transition to next state based on whether we went to a gold or a drop
+				}
+			}
+			else {
+				double[] arcInfo = calculateArc(destPointRelCur);
+				controller.setCurvVel(1.0/arcInfo[0], Kp*arcInfo[1]);
+			}
+		}
 
 		// read hits from sonars and add to buffers
 		private void tryPollSonars () {
 			if (curPose.getPosition().distance(lastPollPosition.getPosition()) > POLL_INTERVAL) {
 				lastPollPosition = curPose;
-				
+				//System.err.println("tryPollSonars");
 				double[] directSonarReadings = new double[16];
 				robot.getSonars(directSonarReadings);
 				RealPoint2D[] sonarPointsBuffer = perceptor.getSonarObstacles();
@@ -1662,7 +1711,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		// Run gradient descent and correct the position of the robot in the maze based on the sonars and the walls		
 		private void tryDescendPose () {
 			if (curPose.getPosition().distance(lastGradientPosition.getPosition()) > GRADIENT_INTERVAL) {
-				
+				//System.err.println("tryDescendPose");
 				ErrorFunction fitter = new WallPointFitter(pointsBuffer, curPose);
 				double[] coords = new double[]{curPose.getX(), curPose.getY(), curPose.getTh()};
 				GradientDescent.descend(fitter, coords);
@@ -1694,10 +1743,107 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 
 		public String toString() {
-			return "draw maze task";
+			return "michael phelps task";
 		}
 	}
-
+	
+	public boolean checkForBlue(UsbCamera cam)
+	{
+		/*UsbCamera cam = UsbCamera.getInstance();
+		PicCanvas canvas = new PicCanvas();
+		getContentPane().add(canvas, BorderLayout.CENTER);
+		this.setSize(UsbCamera.XSIZE, UsbCamera.YSIZE);*/
+		
+		/* Display the window */
+		int xSize = cam.getXSize();
+		int ySize = cam.getYSize();
+		
+		int goldSum = 0;
+		int sum = 0;
+		
+		double rAverage = 0;
+		double bAverage = 0;
+		double gAverage = 0;
+		double rTotal = 0;
+		double bTotal = 0;
+		double gTotal = 0;
+		
+		double rTolerance = 0.24;
+		double bTolerance = 0.40;
+		double gTolerance = 0.18;
+			
+		//for(int i = 0; i < 4; i++)
+		//{
+			cam.snap();
+			//canvas.setImage(cam.getImage());
+			//canvas.setRect(25, 25, 10, 10);
+			
+			sum = 0;
+			goldSum = 0;
+			rAverage = 0;
+			bAverage = 0;
+			gAverage = 0;
+			rTotal = 0;
+			bTotal = 0;
+			gTotal = 0;
+			for(int j = 0; j < xSize; j++)
+			{
+				for(int k = 0; k < ySize; k++)
+				{
+					int[] pixel = cam.getPixel(j, k);
+					double nr = ((double)pixel[UsbCamera.RED])/(pixel[UsbCamera.RED] + pixel[UsbCamera.BLUE] + pixel[UsbCamera.GREEN]);
+					double nb = ((double)pixel[UsbCamera.BLUE])/(pixel[UsbCamera.RED] + pixel[UsbCamera.BLUE] + pixel[UsbCamera.GREEN]);
+					double ng = ((double)pixel[UsbCamera.GREEN])/(pixel[UsbCamera.RED] + pixel[UsbCamera.BLUE] + pixel[UsbCamera.GREEN]);
+					
+					/*sum++;
+					if(sum == 1)
+					{
+						rTotal = nr;
+						bTotal = nb;
+						gTotal = ng;
+						rAverage = nr;
+						bAverage = nb;
+						gAverage = ng;
+					}
+					else
+					{
+						if(abs(nr - rAverage) <= 0.015 &&
+								abs(nb - bAverage) <= 0.015 &&
+								abs(ng - gAverage) <= 0.015)
+							{
+								goldSum++;
+								rTotal += nr;
+								bTotal += nb;
+								gTotal += ng;
+								rAverage = rTotal/sum;
+								bAverage = bTotal/sum;
+								gAverage = gTotal/sum;
+							}
+					}*/
+					sum++;
+					if(abs(nr) <= rTolerance && abs(ng - 0.4) <= gTolerance)
+					{
+						goldSum++;
+						
+					}
+//					System.out.println(" r:"+pixel[UsbCamera.RED]+
+//							" g:"+pixel[UsbCamera.GREEN]+
+//							" b:"+pixel[UsbCamera.BLUE]);
+//					System.out.println("nr:" +nr+
+//							" ng:" +ng+
+//							" nb:" +nb);
+				}
+			}
+			if((double)goldSum/sum > 0.55) {
+				System.out.println(/*i + */ ": yes & goldsum:"+goldSum+" sum:"+sum);
+				return true;
+			}
+			else {
+				System.out.println(/*i + */ ": no & goldsum:"+goldSum+" sum:"+sum);
+				return false;
+			}
+		//}
+	}
 	
 	private static final long serialVersionUID = 0;
 }
