@@ -405,7 +405,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					upcomingTasks.add(new TurnToTask(this, Angle.normalize(theta)));
 					
 					// follow the path
-					upcomingTasks.add(new SolveMazeTask(this, 0.1, mazeFileName));
+					// TODO switched these for testing
+					//upcomingTasks.add(new SolveMazeTask(this, 0.1, mazeFileName));
+					upcomingTasks.add(new MichaelPhelpsTask(this, 0.1, mazeFileName));
 					
 					/* get final heading correct
 					theta = 0;
