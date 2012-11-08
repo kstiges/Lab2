@@ -74,7 +74,7 @@ class SoundExample{
 	}
 	
 	public static void main(String[] argv){
-		playSound("/home/furlong/projects/ta-16-362/src/distribution/illah.wav");
+		playSound("C:\\Documents and Settings\\16x62\\Desktop\\DropIt.wav");
 //		sayText("This is a test.  Goodbye.");
 	}	
 	

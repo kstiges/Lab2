@@ -16,6 +16,10 @@ public class Lookahead {
 	
 	static int currentSegment = 0;
 	
+	public static void zeroCurrentSegment () {
+		currentSegment = 0;
+	}
+	
 	public static void main (String... args) {
 		// make a unit square
 		List<Line2D> pathSegments = new LinkedList<Line2D>();
@@ -42,10 +46,6 @@ public class Lookahead {
 		//*/
 	}
 	
-	public static void zeroCurrentSegment() {
-		currentSegment = 0;
-	}
-	
 	public static List<Line2D> posesToPath (List<RealPose2D> poses) {
 		List<Line2D> pathSegments = new ArrayList<Line2D>();
 		for (int i = 1; i < poses.size(); i++) {
@@ -59,14 +59,18 @@ public class Lookahead {
 		RealPoint2D closestPoint = new RealPoint2D();
 		double minDistSquared = 0.5;
 		int closestSegmentIndex = -1;
+		double closestDistSquared = Double.MAX_VALUE;
 		for (int i = currentSegment; i < pathSegments.size(); i++) {
 			Line2D segment = pathSegments.get(i);
 			RealPoint2D tmp = new RealPoint2D();
 			double tmpDistSquared = LineSegment.closestPointOnLineSegment(segment, robotRelWorld, tmp);
-			if (tmpDistSquared <= minDistSquared) {
+			if (tmpDistSquared <= closestDistSquared) {
 				closestPoint.setLocation(tmp);
 				closestSegmentIndex = i;
+				closestDistSquared = tmpDistSquared;
 				currentSegment = i;
+			}
+			if (closestDistSquared <= minDistSquared) {
 				if (retClosestPoint != null) {
 					retClosestPoint.setLocation(closestPoint);
 				}
@@ -90,7 +94,12 @@ public class Lookahead {
 		// find closest point and segment
 		RealPoint2D closestPoint = new RealPoint2D();
 		int closestSegmentIndex = findClosestPoint(pathSegments, robotRelWorld, closestPoint);
+		//System.err.println(closestSegmentIndex);
 
+		if (closestSegmentIndex < 0){
+			return -1;
+		}
+		
 		// try every segment until the lookahead distance is reached
 		for (int i = closestSegmentIndex; i < pathSegments.size(); i++) {
 			// chop off the part of the segment before the closest point
