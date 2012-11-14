@@ -35,7 +35,6 @@ class SoundExample{
 			AudioFormat format = ais.getFormat();
 			SourceDataLine auline = getSourceDataLine(format);
 
-
 			// Start reading bytes from the file and playing them.
 			int bufSize = 8200;
 			byte[] data = new byte[bufSize];
@@ -73,8 +72,15 @@ class SoundExample{
 		speech.speak(text);
 	}
 	
+	public static void playClip (final String name) {
+		new Thread(new Runnable(){
+			public void run () {
+				playSound("C:\\Documents and Settings\\16x62\\Desktop\\sinNombreSounds\\" + name);
+			}
+		}).start();
+	}
+	
 	public static void main(String[] argv){
-		playSound("C:\\Documents and Settings\\16x62\\Desktop\\DropIt.wav");
 //		sayText("This is a test.  Goodbye.");
 	}	
 	

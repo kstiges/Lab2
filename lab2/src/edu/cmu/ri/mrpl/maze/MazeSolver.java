@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -119,6 +120,45 @@ public class MazeSolver {
 		return result;
 	}
 	
+	
+	public static void dedupPositions (List<MazeState> waypoints) {
+		ListIterator<MazeState> iter = waypoints.listIterator();
+		MazeState lastState = null;
+		while (iter.hasNext()) {
+			MazeState curState = iter.next();
+			// if this state is on top of the previous one, remove the previous one
+			if (lastState != null && curState.pos().equals(lastState.pos())) {
+				iter.previous();
+				iter.previous();
+				iter.remove();
+				iter.next();
+			}
+			lastState = curState;
+		}
+	}
+	
+	public static void main (String... args) {
+		List<MazeState> waypoints = new LinkedList<MazeState>();
+		waypoints.add(new MazeState(0,0,Direction.East));
+		waypoints.add(new MazeState(0,0,Direction.North));
+		waypoints.add(new MazeState(0,1,Direction.North));
+		waypoints.add(new MazeState(0,1,Direction.East));
+		
+		System.out.println(waypoints.size());
+		for (MazeState s : waypoints) {
+			System.out.println(s);
+		}
+		
+		System.out.println("DEDUPING");
+		dedupPositions(waypoints);
+		
+		System.out.println(waypoints.size());
+		for (MazeState s : waypoints) {
+			System.out.println(s);
+		}
+	}
+	
+	/*
 	public static void main (String... args) {
 		List<MazeState> optimalPath;
 		MazeWorld mazeWorld = null;
@@ -134,11 +174,11 @@ public class MazeSolver {
 			System.err.println("Couldn't read maze file!");
 		}
 
-		// TODO test with maze containing gold
 		optimalPath = new MazeSolver(mazeWorld).findPath(true);
 
 		for (MazeState s : optimalPath) {
 			System.out.println(s.pos());
 		}
 	}
+	*/
 }

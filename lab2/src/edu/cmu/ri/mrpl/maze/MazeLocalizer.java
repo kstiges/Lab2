@@ -77,18 +77,13 @@ public class MazeLocalizer {
 	public static List<RealPose2D> statesToPoses (List<MazeState> states) {
 		List<RealPose2D> result = new LinkedList<RealPose2D>();
 		
-		RealPoint2D lastPosition = null;
+		// skip all but the last state in the same place
+		MazeSolver.dedupPositions(states);
 		
 		for (MazeState s : states) {
 			RealPose2D pose = mazeStateToWorldPose(s);
 			
-			// skip pairs of poses in the same position
-			RealPoint2D position = pose.getPosition();
-			if (position.equals(lastPosition))
-				result.remove(result.size() - 1);
-			lastPosition = position;
-			
-			// TODO generalize this
+			// TODO generalize this?
 			result.add(new RealPose2D(pose.getX()-CELL_RADIUS, pose.getY()-CELL_RADIUS, pose.getTh()));
 		}
 		

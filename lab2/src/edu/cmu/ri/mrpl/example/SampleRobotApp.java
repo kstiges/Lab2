@@ -730,7 +730,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 			}
 
-			speech.speak("error " + AngleMath.roundTo2(angleErr*1000) + " milliradians");
+			//speech.speak("error " + AngleMath.roundTo2(angleErr*1000) + " milliradians");
 			//System.out.println("curAngle: " + curAngle);
 			controller.stop();
 		}
@@ -1551,7 +1551,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		
 		// used in Subtask DROP_GOLD
 		private double dropStartTime;
-		private boolean skrillPlaying = false;
 		
 		// GOTO stuff
 		private double xOffset;
@@ -1673,10 +1672,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					//transitionTo(Subtask.TURNTO_GOLD_CHECK);
 					break;
 				case DROP_GOLD:
-					if (!skrillPlaying) {
-						SoundExample.main(new String[0]);
-						skrillPlaying = true;
-					}
 					// handle this inline since it's so simple
 					if (System.currentTimeMillis() - dropStartTime > 5000) {
 						hasGold = false;
@@ -1684,7 +1679,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						mazeWorld.removeAllInits();
 						mazeWorld.addInit(goalState);
 						transitionTo(Subtask.START);
-						skrillPlaying = false;
 					}
 					break;
 				}
@@ -1701,8 +1695,27 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void transitionTo (Subtask t) {
-			System.err.println("-> " + t);
 			curSubtask = t;
+			
+			// debug output
+			System.err.println("-> " + t);
+			
+			// play sound clips
+			// TODO add speech back in? nah....
+			switch (t) {
+			case DROP_GOLD: 
+				SoundExample.playClip("DropIt.wav");
+				break;
+				
+			case FOLLOWPATH_GOLD_CELL:
+			case FOLLOWPATH_DROP_CELL:
+				SoundExample.playClip("speed.wav");
+				break;
+			
+			case TURNTO_GOLD:
+				SoundExample.playClip("golddigga.wav");
+				break;
+			}
 		}
 		
 		private void start() {
@@ -1849,7 +1862,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 							actualOffset = min(actualOffset, WALL_METERS/4);
 							setupGotoHelper(actualOffset);
 							
-							speech.speak("found, picking up");
+							//speech.speak("found, picking up");
 							transitionTo(Subtask.GOTO_GOLD_WALL);
 						}
 						else
@@ -1857,7 +1870,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 							mazeWorld.removeGold(goalState);
 							mazeWorld.removeAllInits();
 							mazeWorld.addInit(goalState);
-							speech.speak("not found");
+							//speech.speak("not found");
 							transitionTo(Subtask.START);
 						}
 						break;
@@ -1870,7 +1883,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 							mazeWorld.removeGold(goalState);
 							mazeWorld.removeAllInits();
 							mazeWorld.addInit(goalState);
-							speech.speak("success, moving");
+							//speech.speak("success, moving");
 							setupPathHelper();
 						}
 						else {
@@ -1880,7 +1893,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 							mazeWorld.removeAllInits();
 							mazeWorld.addInit(goalState);
 							goalState = null;
-							speech.speak("failure, skipping");
+							//speech.speak("failure, skipping");
 							transitionTo(Subtask.START);
 						}
 						break;
@@ -1933,7 +1946,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						transitionTo(Subtask.TURNTO_DROP);
 					}
 					else {
-						speech.speak("searching");
+						//speech.speak("searching");
 						transitionTo(Subtask.TURNTO_GOLD);
 					}
 				}
