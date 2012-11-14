@@ -28,7 +28,9 @@ import java.awt.image.BufferedImage;
 import javax.swing.*;
 
 import edu.cmu.ri.mrpl.*;
+import edu.cmu.ri.mrpl.CommClient.CommException;
 import edu.cmu.ri.mrpl.Robot;
+import edu.cmu.ri.mrpl.comm.Serializer;
 import edu.cmu.ri.mrpl.kinematics2D.Angle;
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
@@ -40,6 +42,7 @@ import edu.cmu.ri.mrpl.maze.MazeRobot;
 import edu.cmu.ri.mrpl.maze.MazeSolver;
 import edu.cmu.ri.mrpl.maze.MazeState;
 import edu.cmu.ri.mrpl.maze.MazeWorld;
+import edu.cmu.ri.mrpl.maze.MazeWorld.Direction;
 import edu.cmu.ri.mrpl.usbCamera.PicCanvas;
 import edu.cmu.ri.mrpl.usbCamera.UsbCamera;
 import edu.cmu.ri.mrpl.util.AngleMath;
@@ -1514,6 +1517,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private Controller controller;
 		private Speech speech;
 		private UsbCamera cam;
+		private CommClient comm;
+		private Serializer serializer;
 
 		private Perceptor perceptor;
 		private MazeLocalizer correctedLocalizer;
@@ -1586,6 +1591,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			pointsBuffer = new RingBuffer<Point2D>(400);
 			correctedLocalizer = new MazeLocalizer(mazeWorld, false);
 			rawLocalizer = new MazeLocalizer(mazeWorld, true);
+			comm = new CommClient("128.237.244.165");
 			
 			// locate robot in maze
 			MazeState init = mazeWorld.getInits().iterator().next();
@@ -1626,7 +1632,63 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			curPose = perceptor.getCorrectedPose();
 			lastPollPosition = curPose;
-			lastGradientPosition = curPose;
+			lastGradientPosition = curPose;//commclient test stuff
+			String myName = "SinNombreA";
+			String myFriends[] = {"SinNombreB"};
+
+			try{
+				//CommClient will throw an exception if it does not succeed
+				comm.connectToFriends(myName, myFriends);
+			}
+			catch(CommException e) {
+				System.err.println("Comm Exception: " + e);
+				//All errors except missing-friends are not handled here.
+				if(!e.getMessage().startsWith("missing-friends")){
+					System.err.println("Giving up");
+					return;
+				}
+
+				//Wait until all friends connect.
+				boolean friendsReady = false;
+				while(!friendsReady){
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
+					}
+					try {
+						comm.getIncomingMessage();
+					} catch (CommException e1) {
+						System.err.println("Comm Exception: " + e1);
+						if(e1.getMessage().startsWith("friends-ready"))
+							friendsReady = true;
+						else{
+							//Again, anything except freinds-ready is not handled.
+							System.err.println("Giving up");
+							return;
+						}
+					}
+				}
+			}
+			serializer = new Serializer(comm, myFriends[0]);
+
+			List<MazeState> received = null;
+			List<MazeState> waypoints = new ArrayList<MazeState>(2);
+			waypoints.add(new MazeState(1,2,Direction.South));
+			waypoints.add(new MazeState(3,2,Direction.North));
+			
+			serializer.sendWaypoints(waypoints);
+			try {
+				received = serializer.receiveWaypoints();
+			}
+			catch (CommException e)
+			{
+				e.printStackTrace();
+			}
+				
+			for (MazeState s : received) {
+				System.out.println(s);
+			}
 
 			// stopping handled by START subtask method
 			// which transitions to END_TASK if there are no more golds

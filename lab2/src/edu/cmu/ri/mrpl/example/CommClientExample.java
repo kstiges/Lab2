@@ -11,8 +11,9 @@ import java.util.*;
 
 public class CommClientExample {
 	public static void main(String[] args) {
-		CommClient cc = new CommClient("gs5038.sp.cs.cmu.edu");
-		
+		//CommClient cc = new CommClient("gs5038.sp.cs.cmu.edu");
+		CommClient cc = new CommClient("128.237.244.165");
+
 		// Get friends 
 		if(args.length != 2){
 			System.out.println("Usage - java CommClientExample name1 name2");

@@ -49,7 +49,8 @@ public class Serializer {
 	}
 	
 	public MazeState receiveMazeState () throws CommException {
-		String message = cc.getIncomingMessage();
+		String message = null;
+		message = singleString();
 		return parseMazeState(message);
 	}
 	
@@ -76,11 +77,28 @@ public class Serializer {
 		}
 	}
 	
+	private String singleString()
+	{
+		String tmp = null;
+		do{
+			try {
+				tmp = cc.getIncomingMessage();
+			} catch (CommException e) {
+				e.printStackTrace();
+				break;
+			}
+		}while(tmp == null);
+		
+		return tmp;
+	}
+	
 	public List<MazeState> receiveWaypoints () throws NumberFormatException, CommException {
 		int size = Integer.parseInt(cc.getIncomingMessage());
 		List<String> messages = new ArrayList<String>(size+1);
+		String tmp = null;
 		while (size-- > 0) {
-			messages.add(cc.getIncomingMessage());
+			tmp = singleString();
+			messages.add(tmp);
 		}
 		return parseWaypoints(messages);
 	}
