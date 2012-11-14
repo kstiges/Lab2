@@ -17,7 +17,14 @@ public class Lookahead {
 	static int currentSegment = 0;
 	
 	public static void zeroCurrentSegment () {
-		currentSegment = 0;
+		setCurrentSegment(0);
+	}
+	
+	private static void setCurrentSegment (int i) {
+		if (i > currentSegment) {
+			//System.err.println("increasing Lookahead.currentSegment to " + i);
+		}
+		currentSegment = i;
 	}
 	
 	public static void main (String... args) {
@@ -68,14 +75,15 @@ public class Lookahead {
 				closestPoint.setLocation(tmp);
 				closestSegmentIndex = i;
 				closestDistSquared = tmpDistSquared;
-				currentSegment = i;
+				setCurrentSegment(i);
 			}
-			if (closestDistSquared <= minDistSquared) {
+			/*if (closestDistSquared <= minDistSquared) {
 				if (retClosestPoint != null) {
 					retClosestPoint.setLocation(closestPoint);
 				}
+				setCurrentSegment(i);
 				return closestSegmentIndex;
-			}
+			}*/
 		}
 		/*
 		if (oldClosestSegment != null && !closestSegment.equals(oldClosestSegment)) {
@@ -126,7 +134,8 @@ public class Lookahead {
 					if (retLookaheadPoint != null) {
 						retLookaheadPoint.setLocation(lookaheadPoint);
 					}
-					currentSegment = i;
+					// TODO FIXME
+					//setCurrentSegment(i);
 					return i;
 				}
 			}

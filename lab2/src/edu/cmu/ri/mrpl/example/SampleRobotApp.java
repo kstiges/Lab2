@@ -1503,7 +1503,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		FOLLOWPATH_GOLD_CELL,
 		GOTO_GOLD_WALL, GO_FROM_GOLD_WALL,
 		FOLLOWPATH_DROP_CELL, DROP_GOLD,
-		TURNTO_GOLD, TURNTO_GOLD_CHECK, TURNTO_PATH,
+		TURNTO_GOLD, TURNTO_GOLD_CHECK, TURNTO_PATH, TURNTO_DROP,
 		
 		END_TASK // used to end the overall Task
 	}
@@ -1512,7 +1512,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	class MichaelPhelpsTask extends Task {
 		private RealPose2D robotStartedHere;
 		private Controller controller;
-		// TODO use this
 		private Speech speech;
 		private UsbCamera cam;
 
@@ -1536,7 +1535,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		// used in Subtasks GOTO_GOLD_CELL, GOTO_DROP_CELL
 		private java.util.List<Line2D> pathSegments;
 		private double maxDeviation;
-		private static final double LOOKAHEAD_DISTANCE = .6;
+		private static final double LOOKAHEAD_DISTANCE = 1;
+		private Point2D lookaheadPointRelWorld;
+		private boolean stopping = false;
 		
 		// turn to stuff
 		// used in Subtask TURNTO
@@ -1548,6 +1549,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private static final double ANGLE_TOLERANCE = 0.01;
 		private static final double SPEED_TOLERANCE = 0.01;
 		
+		// used in Subtask DROP_GOLD
 		private double dropStartTime;
 		private boolean skrillPlaying = false;
 		
@@ -1557,13 +1559,14 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private RealPose2D lastPoseRelStart;
 		private Point2D destPointRelStart;
 		private Point2D startPoint;
-		static final double IDEAL_GOLD_OFFSET = CELL_RADIUS - 1.6*ROBOT_RADIUS;
+		static final double IDEAL_GOLD_OFFSET = CELL_RADIUS - 1.4*ROBOT_RADIUS;
 		
 		// sonar localization stuff
 		private RealPose2D lastPollPosition;
 		private static final double POLL_INTERVAL = 0.01; // meters between polling the sonars
 		private RealPose2D lastGradientPosition;
 		private static final double GRADIENT_INTERVAL = .1; // meters between running gradient descent on points
+		double[] directSonarReadings = new double[16];
 		private RingBuffer<Point2D> pointsBuffer;
 
 		public MichaelPhelpsTask(TaskController tc, double maxDeviation, String mazeFileName) {
@@ -1618,6 +1621,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			RealPose2D rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
 			contBotList.add(new ContRobot(rawPosition, Color.RED));
 			contBotList.add(new ContRobot(correctedPosition, Color.GREEN));
+			// TODO add robot used for lookahead point if needed
+			//contBotList.add(new ContRobot(new RealPose2D(0,0,0), new Color(0f, 0f, 1f, 0.5f)));
 			mazeGraphics.setContRobots(contBotList);
 			
 			curPose = perceptor.getCorrectedPose();
@@ -1653,6 +1658,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				case TURNTO_GOLD:
 				case TURNTO_GOLD_CHECK:
 				case TURNTO_PATH:
+				case TURNTO_DROP:
 					turnTo();
 					break;
 					
@@ -1727,7 +1733,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private void setupGotoHelper (double xOffset) {
 			this.xOffset = xOffset;
 			// XXX janky
-			this.xOffset += .1;
 			startPoint = curPose.getPosition();
 			System.out.println("setupGotoHelper: xOffset = " + xOffset);
 			robotStartedHere = curPose;
@@ -1763,7 +1768,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					//System.err.println("finished goto: " + distanceTraveled);
 					switch (curSubtask) {
 					case GOTO_GOLD_WALL:
-						setupGotoHelper(-IDEAL_GOLD_OFFSET);
+						setupGotoHelper(-xOffset); //was -IDEAL_GOLD_OFFSET
 						transitionTo(Subtask.GO_FROM_GOLD_WALL);
 						break;
 								
@@ -1796,7 +1801,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			controller.setVel(speed, speed);
 		}
 		
-		private void turnTo () {
+		private void turnTo() {
 			final double Kp = .4;
 			final double Kd = 95;
 			
@@ -1828,7 +1833,16 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						Point2D idealGoalPoint = goalPose.inverseTransform(new Point2D.Double(IDEAL_GOLD_OFFSET, 0), null);
 						double actualOffset = curPose.transform(idealGoalPoint, null).getX();
 						if(checkForBlue(cam)) {
+							// TODO get this working right
+							//setupGotoHelper(actualOffset);
+							setupGotoHelper(.1);
+							/*
+							actualOffset = directSonarReadings[0]/2 - 0*ROBOT_RADIUS;
+							// clamp offset to work around shitty sonars
+							actualOffset = max(actualOffset, 0);
+							actualOffset = min(actualOffset, WALL_METERS/4);
 							setupGotoHelper(actualOffset);
+							*/
 							speech.speak("found, picking up");
 							transitionTo(Subtask.GOTO_GOLD_WALL);
 						}
@@ -1864,6 +1878,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 							transitionTo(Subtask.START);
 						}
 						break;
+						
+					case TURNTO_DROP:
+						// mark current time
+						dropStartTime = System.currentTimeMillis();
+						transitionTo(Subtask.DROP_GOLD);
+						break;
 					}
 				}
 			}
@@ -1887,23 +1907,24 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void followPath() {
-			final double Kp = 1.2;// was 2
+			final double Kp = 2;// TODO switch between 1.2 and 2
 			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
 			RealPoint2D tmp = new RealPoint2D();
 			int segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
+			lookaheadPointRelWorld = tmp;
 			Point2D destPointRelCur = correctedPoseRelStart.inverseTransform(tmp, null);
 			// transition to something if we're approaching the end of the path
 			double distToEnd = destPointRelCur.distance(new Point2D.Double());
-			if (pathSegments.size() == 0 || (segment == pathSegments.size() - 1
-					&& (distToEnd < 0.75*perceptor.getSpeed() || distToEnd < 0.07))) {
+			if (stopping || pathSegments.size() == 0 || (segment == pathSegments.size() - 1
+					&& distToEnd < 0.85*perceptor.getSpeed())) {
+				stopping = true;
 				controller.stop();
 				if (perceptor.getSpeed() == 0) {
+					stopping = false;
 					// same conversation as MazeLocalizer.mazeStateToWorldPose
 					destAngle = goalState.dir().ordinal() * PI/2;
 					if (hasGold) {
-						// mark current time
-						dropStartTime = System.currentTimeMillis();
-						transitionTo(Subtask.DROP_GOLD);
+						transitionTo(Subtask.TURNTO_DROP);
 					}
 					else {
 						speech.speak("searching");
@@ -1922,7 +1943,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			if (curPose.getPosition().distance(lastPollPosition.getPosition()) > POLL_INTERVAL) {
 				lastPollPosition = curPose;
 				//System.err.println("tryPollSonars");
-				double[] directSonarReadings = new double[16];
 				robot.getSonars(directSonarReadings);
 				RealPoint2D[] sonarPointsBuffer = perceptor.getSonarObstacles();
 				for (int i=0; i<sonarPointsBuffer.length; i++) {
@@ -1960,6 +1980,10 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			synchronized(contBotList) {
 				contBotList.get(0).pose.setPose(rawPosition.getX(), rawPosition.getY(), rawPosition.getTh()*PI/2);
 				contBotList.get(1).pose.setPose(correctedPosition.getX(), correctedPosition.getY(), correctedPosition.getTh()*PI/2);
+				if (lookaheadPointRelWorld != null) {
+					// TODO use this to debug lookahead if needed
+					//contBotList.get(2).pose.setPose(lookaheadPointRelWorld.getX(), lookaheadPointRelWorld.getY(), 0);
+				}
 			}
 			
 			remainingField.setText(String.format("(%.2f, %.2f, %.2f)",
@@ -2038,7 +2062,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		feedbackCanvas.repaint();
 		feedbackFrame.repaint();
 		
-		if((double)goldSum/sum > 0.3) {
+		if((double)goldSum/sum > 0.1) {
 			System.out.println(/*i + */ ": yes & goldsum:"+goldSum+" sum:"+sum);
 			return true;
 		}

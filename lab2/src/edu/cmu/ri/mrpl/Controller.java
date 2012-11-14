@@ -5,7 +5,7 @@ import static java.lang.Math.*;
 
 public class Controller {
 	Robot robot;
-	public static final double MAX_SPEED = 0.4;
+	public static final double MAX_SPEED = 0.65;
 	
 	public Controller (Robot robot) {
 		this.robot = robot;
