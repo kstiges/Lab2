@@ -16,7 +16,37 @@ public class Cooperation {
 		Point aPos = new Point(a.x(), a.y());
 		Point bPos = new Point(b.x(), b.y());
 		double dist = aPos.distance(bPos);
-		return dist == 0 || (dist == 1 && a.dir().rear() == b.dir());
+		
+		// states are in the same position
+		if (dist == 0) {
+			return true;
+		}
+		// states are not adjacent
+		else if (dist > 1) {
+			return false;
+		}
+		
+		// states are adjacent on the same row
+		if (aPos.y == bPos.y) {
+			MazeState leftState = aPos.x < bPos.x ? a : b;
+			MazeState rightState = leftState == a ? b : a;
+			// states point towards each other
+			if (leftState.dir() == Direction.East && rightState.dir() == Direction.West) {
+				return true;
+			}
+		}
+		
+		// states are adjacent on the same column
+		if (aPos.x == bPos.x) {
+			MazeState topState = aPos.y > bPos.y ? a : b;
+			MazeState bottomState = topState == a ? b : a;
+			// states point towards each other
+			if (topState.dir() == Direction.South && bottomState.dir() == Direction.North) {
+				return true;
+			}
+		}
+		
+		return false;
 	}
 	
 	public static boolean waypointListsCollide(List<MazeState> waypointsA,
