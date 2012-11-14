@@ -1829,20 +1829,26 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						break;
 						
 					case TURNTO_GOLD:
-						RealPose2D goalPose = MazeLocalizer.mazeStateToWorldPose(goalState);
-						Point2D idealGoalPoint = goalPose.inverseTransform(new Point2D.Double(IDEAL_GOLD_OFFSET, 0), null);
-						double actualOffset = curPose.transform(idealGoalPoint, null).getX();
+						double actualOffset;
 						if(checkForBlue(cam)) {
 							// TODO get this working right
-							//setupGotoHelper(actualOffset);
-							setupGotoHelper(.1);
-							/*
-							actualOffset = directSonarReadings[0]/2 - 0*ROBOT_RADIUS;
-							// clamp offset to work around shitty sonars
+							// technique 1
+							actualOffset = 0.1;
+							
+							/* technique 2
+							RealPose2D goalPose = MazeLocalizer.mazeStateToWorldPose(goalState);
+							Point2D idealGoalPoint = goalPose.inverseTransform(new Point2D.Double(IDEAL_GOLD_OFFSET, 0), null);
+							actualOffset = curPose.transform(idealGoalPoint, null).getX();
+							*/
+						
+							// technique 3
+							//actualOffset = directSonarReadings[0]/2 - 0*ROBOT_RADIUS;
+
+							// clamp offset to work around shitty sonars/calculations
 							actualOffset = max(actualOffset, 0);
 							actualOffset = min(actualOffset, WALL_METERS/4);
 							setupGotoHelper(actualOffset);
-							*/
+							
 							speech.speak("found, picking up");
 							transitionTo(Subtask.GOTO_GOLD_WALL);
 						}
