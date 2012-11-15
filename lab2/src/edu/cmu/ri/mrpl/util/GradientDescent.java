@@ -24,6 +24,8 @@ public class GradientDescent {
 	}
 
 	public static void descend (ErrorFunction errFunc, double[] args) {
+		boolean debugIter = Math.random() < 0.01;
+		debugIter = true;
 		double error;
 		int counter = -1;
 		while ((error = errFunc.getError(args)) > ERROR_THRESHOLD && counter++ <= 350) {
@@ -36,6 +38,10 @@ public class GradientDescent {
 			args[0] -= dx;
 			args[1] -= dy;
 			args[2] -= dtheta;
+			
+			if (debugIter && (counter % 50) == 0) {
+				System.out.printf("error @ %d: %f \n", counter, error);
+			}
 
 			/*
 			if (counter % 1000 == 0) {

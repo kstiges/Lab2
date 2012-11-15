@@ -8,16 +8,27 @@ import edu.cmu.ri.mrpl.CommClient.CommException;
 import edu.cmu.ri.mrpl.maze.MazeState;
 import edu.cmu.ri.mrpl.maze.MazeWorld.Direction;
 
-public class Serializer {
+public class Messaging {
 	CommClient cc;
 	String friend;
 	
-	public Serializer (CommClient cc, String friend) {
+	public Messaging (CommClient cc, String friend) {
 		this.cc = cc;
 		this.friend = friend;
 	}
 	
 	public static final String DELIM = ",";
+	
+	public enum Action {
+		REMOVE_GOLD, REMOVE_DROP, GO
+	}
+	
+	public void sendAction (Action a, MazeState s) {
+		cc.send(friend, a.ordinal() + "");
+		if (a != Action.GO) {
+			sendMazeState(s);
+		}
+	}
 	
 	public static String join (Object[] objs) {
 		StringBuilder sb = new StringBuilder();
@@ -65,7 +76,7 @@ public class Serializer {
 	
 	public static List<MazeState> parseWaypoints (List<String> messages) {
 		List<MazeState> waypoints = new ArrayList<MazeState>(messages.size()-1);
-		for (int i = 1; i < messages.size(); i++) {
+		for (int i = 0; i < messages.size(); i++) {
 			waypoints.add(parseMazeState(messages.get(i)));
 		}
 		return waypoints;
@@ -74,6 +85,7 @@ public class Serializer {
 	public void sendWaypoints (List<MazeState> waypoints) {
 		for (String message : serializeWaypoints(waypoints)) {
 			cc.send(friend, message);
+			System.out.println("sending to "+friend+" message: "+message);
 		}
 	}
 	
@@ -93,11 +105,13 @@ public class Serializer {
 	}
 	
 	public List<MazeState> receiveWaypoints () throws NumberFormatException, CommException {
-		int size = Integer.parseInt(cc.getIncomingMessage());
+		int size = Integer.parseInt(singleString());
+		System.out.println("received int size: "+size);
 		List<String> messages = new ArrayList<String>(size+1);
 		String tmp = null;
 		while (size-- > 0) {
 			tmp = singleString();
+			System.out.println("received message: "+tmp);
 			messages.add(tmp);
 		}
 		return parseWaypoints(messages);

@@ -72,10 +72,17 @@ class SoundExample{
 		speech.speak(text);
 	}
 	
-	public static void playClip (final String name) {
+	public static String getClipPath (String name) {
+		return "C:\\Documents and Settings\\16x62\\Desktop\\sinNombreSounds\\" + name;
+	}
+	
+	public static void playClips (final String names) {
+		final String[] splits = names.split(" ");
 		new Thread(new Runnable(){
 			public void run () {
-				playSound("C:\\Documents and Settings\\16x62\\Desktop\\sinNombreSounds\\" + name);
+				for (String name : splits) {
+					playSound(getClipPath(name));
+				}
 			}
 		}).start();
 	}

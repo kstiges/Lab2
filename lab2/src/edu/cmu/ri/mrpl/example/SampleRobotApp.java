@@ -30,7 +30,7 @@ import javax.swing.*;
 import edu.cmu.ri.mrpl.*;
 import edu.cmu.ri.mrpl.CommClient.CommException;
 import edu.cmu.ri.mrpl.Robot;
-import edu.cmu.ri.mrpl.comm.Serializer;
+import edu.cmu.ri.mrpl.comm.Messaging;
 import edu.cmu.ri.mrpl.kinematics2D.Angle;
 import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
 import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
@@ -46,6 +46,7 @@ import edu.cmu.ri.mrpl.maze.MazeWorld.Direction;
 import edu.cmu.ri.mrpl.usbCamera.PicCanvas;
 import edu.cmu.ri.mrpl.usbCamera.UsbCamera;
 import edu.cmu.ri.mrpl.util.AngleMath;
+import edu.cmu.ri.mrpl.util.Cooperation;
 import edu.cmu.ri.mrpl.util.GradientDescent;
 import edu.cmu.ri.mrpl.util.GradientDescent.WallPointFitter;
 import edu.cmu.ri.mrpl.util.Lookahead;
@@ -95,6 +96,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	JFrame feedbackFrame;
 	PicCanvas cameraCanvas;
 	PicCanvas feedbackCanvas;
+	CommClient comm;
+	Messaging serializer;
 
 	public SampleRobotApp() {
 		super("Kick Ass Sample Robot App");
@@ -118,8 +121,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		connectButton = new JButton("connect");
 		disconnectButton = new JButton("disconnect");
 
-		pauseButton = new JButton("Pause!");
-		waitButton = new JButton("Wait!");
+		pauseButton = new JButton("Test camera");
+		waitButton = new JButton("Setup comms");
 		turnToButton = new JButton("Turn to angle!");
 		goToButton = new JButton("Go to distance!");
 		poseToButton = new JButton("Go to pose!");
@@ -375,8 +378,50 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			System.out.println("blue: "+checkForBlue(cam));
 		} else if ( source==waitButton ) {
-			upcomingTasks.add(new WaitTask(this, argument));
-			startUpcomingTasks();
+//			upcomingTasks.add(new WaitTask(this, argument));
+//			startUpcomingTasks();
+			comm = new CommClient("128.237.244.165");
+			
+			//commclient test stuff
+			String myName = "SinNombreB";
+			String myFriends[] = {"SinNombreA"};
+
+			//*
+			try{
+				//CommClient will throw an exception if it does not succeed
+				comm.connectToFriends(myName, myFriends);
+			}
+			catch(CommException err) {
+				System.err.println("Comm Exception: " + err);
+				//All errors except missing-friends are not handled here.
+				if(!err.getMessage().startsWith("missing-friends")){
+					System.err.println("Giving up");
+					return;
+				}
+
+				//Wait until all friends connect.
+				boolean friendsReady = false;
+				while(!friendsReady){
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
+					}
+					try {
+						comm.getIncomingMessage();
+					} catch (CommException e1) {
+						System.err.println("Comm Exception: " + e1);
+						if(e1.getMessage().startsWith("friends-ready"))
+							friendsReady = true;
+						else{
+							//Again, anything except freinds-ready is not handled.
+							System.err.println("Giving up");
+							return;
+						}
+					}
+				}
+			}
+			serializer = new Messaging(comm, myFriends[0]);
 		} else if ( source==turnToButton ) {
 			upcomingTasks.add(new TurnToTask(this, argument));
 			startUpcomingTasks();
@@ -1517,8 +1562,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private Controller controller;
 		private Speech speech;
 		private UsbCamera cam;
-		private CommClient comm;
-		private Serializer serializer;
 
 		private Perceptor perceptor;
 		private MazeLocalizer correctedLocalizer;
@@ -1564,6 +1607,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private Point2D destPointRelStart;
 		private Point2D startPoint;
 		static final double IDEAL_GOLD_OFFSET = CELL_RADIUS - 1.4*ROBOT_RADIUS;
+		static final double MAGNET_DISTANCE = 0.5 * ROBOT_RADIUS;
+		private boolean retryGoto = false;
+		static final double RETRY_OFFSET = 0.05;
 		
 		// sonar localization stuff
 		private RealPose2D lastPollPosition;
@@ -1591,7 +1637,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			pointsBuffer = new RingBuffer<Point2D>(400);
 			correctedLocalizer = new MazeLocalizer(mazeWorld, false);
 			rawLocalizer = new MazeLocalizer(mazeWorld, true);
-			comm = new CommClient("128.237.244.165");
 			
 			// locate robot in maze
 			MazeState init = mazeWorld.getInits().iterator().next();
@@ -1632,63 +1677,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			curPose = perceptor.getCorrectedPose();
 			lastPollPosition = curPose;
-			lastGradientPosition = curPose;//commclient test stuff
-			String myName = "SinNombreA";
-			String myFriends[] = {"SinNombreB"};
-
-			try{
-				//CommClient will throw an exception if it does not succeed
-				comm.connectToFriends(myName, myFriends);
-			}
-			catch(CommException e) {
-				System.err.println("Comm Exception: " + e);
-				//All errors except missing-friends are not handled here.
-				if(!e.getMessage().startsWith("missing-friends")){
-					System.err.println("Giving up");
-					return;
-				}
-
-				//Wait until all friends connect.
-				boolean friendsReady = false;
-				while(!friendsReady){
-					try {
-						Thread.sleep(1000);
-					} catch (InterruptedException e1) {
-						e1.printStackTrace();
-					}
-					try {
-						comm.getIncomingMessage();
-					} catch (CommException e1) {
-						System.err.println("Comm Exception: " + e1);
-						if(e1.getMessage().startsWith("friends-ready"))
-							friendsReady = true;
-						else{
-							//Again, anything except freinds-ready is not handled.
-							System.err.println("Giving up");
-							return;
-						}
-					}
-				}
-			}
-			serializer = new Serializer(comm, myFriends[0]);
-
-			List<MazeState> received = null;
-			List<MazeState> waypoints = new ArrayList<MazeState>(2);
-			waypoints.add(new MazeState(1,2,Direction.South));
-			waypoints.add(new MazeState(3,2,Direction.North));
-			
-			serializer.sendWaypoints(waypoints);
-			try {
-				received = serializer.receiveWaypoints();
-			}
-			catch (CommException e)
-			{
-				e.printStackTrace();
-			}
-				
-			for (MazeState s : received) {
-				System.out.println(s);
-			}
+			lastGradientPosition = curPose;
 
 			// stopping handled by START subtask method
 			// which transitions to END_TASK if there are no more golds
@@ -1705,6 +1694,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				if (curSubtask == Subtask.END_TASK){
 					break;
 				}
+				
+				// TODO get message(s) from partner and respond
 				
 				switch (curSubtask) {
 				case START:
@@ -1764,20 +1755,27 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			// play sound clips
 			// TODO add speech back in? nah....
+			//*
 			switch (t) {
 			case DROP_GOLD: 
-				SoundExample.playClip("DropIt.wav");
+				SoundExample.playClips("DropIt.wav");
 				break;
 				
 			case FOLLOWPATH_GOLD_CELL:
-			case FOLLOWPATH_DROP_CELL:
-				SoundExample.playClip("speed.wav");
+				SoundExample.playClips("speed.wav");
+				break;
+				
+			case TURNTO_PATH:
+				if (hasGold) {
+					SoundExample.playClips("success.wav speed.wav");
+				}
 				break;
 			
 			case TURNTO_GOLD:
-				SoundExample.playClip("golddigga.wav");
+				SoundExample.playClips("golddigga.wav");
 				break;
 			}
+			//*/
 		}
 		
 		private void start() {
@@ -1904,25 +1902,46 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						break;
 						
 					case TURNTO_GOLD:
-						double actualOffset;
+						double[] actualOffset = new double[3];
 						if(checkForBlue(cam)) {
 							// TODO get this working right
 							// technique 1
-							actualOffset = 0.1;
+							actualOffset[0] = 0.1;
 							
-							/* technique 2
+							//* technique 2
 							RealPose2D goalPose = MazeLocalizer.mazeStateToWorldPose(goalState);
 							Point2D idealGoalPoint = goalPose.inverseTransform(new Point2D.Double(IDEAL_GOLD_OFFSET, 0), null);
-							actualOffset = curPose.transform(idealGoalPoint, null).getX();
-							*/
+							actualOffset[1] = curPose.transform(idealGoalPoint, null).getX();
+							//*/
 						
 							// technique 3
-							//actualOffset = directSonarReadings[0]/2 - 0*ROBOT_RADIUS;
+							actualOffset[2] = directSonarReadings[0] - MAGNET_DISTANCE;
+							System.out.println("first sonar: " + directSonarReadings[0]);
+							robot.updateState();
+							actualOffset[2] = actualOffset[2] + directSonarReadings[0] - MAGNET_DISTANCE;
+							System.out.println("second sonar: " + directSonarReadings[0]);
+							robot.updateState();
+							actualOffset[2] = (actualOffset[2] + directSonarReadings[0] - MAGNET_DISTANCE)/3;
+							System.out.println("third sonar: " + directSonarReadings[0]);
+							
+							for (int i = 0; i < actualOffset.length; i++) {
+								System.out.printf("actualOffset[%d] = %.2f \n", i, actualOffset[i]);
+							}
+							
+							// TODO change index to change technique
+							double chosenOffset;
+							if (retryGoto) {
+								chosenOffset = -xOffset;
+								chosenOffset += RETRY_OFFSET;
+							}
+							else {
+								chosenOffset = actualOffset[2];
+							}
 
 							// clamp offset to work around shitty sonars/calculations
-							actualOffset = max(actualOffset, 0);
-							actualOffset = min(actualOffset, WALL_METERS/4);
-							setupGotoHelper(actualOffset);
+							chosenOffset = max(chosenOffset, 0);
+							chosenOffset = min(chosenOffset, WALL_METERS/5);
+							setupGotoHelper(chosenOffset);
 							
 							//speech.speak("found, picking up");
 							transitionTo(Subtask.GOTO_GOLD_WALL);
@@ -1938,18 +1957,22 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						break;
 						
 					case TURNTO_GOLD_CHECK:
-						// XXX debug
 						if (checkForBlue(cam)) {
-						//if (true) {
 							hasGold = true;
 							mazeWorld.removeGold(goalState);
 							mazeWorld.removeAllInits();
 							mazeWorld.addInit(goalState);
 							//speech.speak("success, moving");
 							setupPathHelper();
+							retryGoto = false;
 						}
 						else {
 							// TODO try to grab again? NOPE
+							retryGoto = true;
+							// same conversation as MazeLocalizer.mazeStateToWorldPose
+							destAngle = goalState.dir().ordinal() * PI/2;
+							transitionTo(Subtask.TURNTO_GOLD);
+							/*
 							hasGold = false;
 							mazeWorld.removeGold(goalState);
 							mazeWorld.removeAllInits();
@@ -1957,6 +1980,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 							goalState = null;
 							//speech.speak("failure, skipping");
 							transitionTo(Subtask.START);
+							*/
 						}
 						break;
 						
@@ -1988,7 +2012,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void followPath() {
-			final double Kp = 2;// TODO switch between 1.2 and 2
+			final double Kp = 1;// TODO switch between 1.2 and 2
 			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
 			RealPoint2D tmp = new RealPoint2D();
 			int segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
@@ -1997,8 +2021,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			// transition to something if we're approaching the end of the path
 			double distToEnd = destPointRelCur.distance(new Point2D.Double());
 			if (stopping || pathSegments.size() == 0 || (segment == pathSegments.size() - 1
-					&& distToEnd < 0.85*perceptor.getSpeed())) {
-				stopping = true;
+					&& distToEnd < 0.80*perceptor.getSpeed() || distToEnd < 0.05)) {
+				//stopping = true;
 				controller.stop();
 				if (perceptor.getSpeed() == 0) {
 					stopping = false;
@@ -2018,6 +2042,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				controller.setCurvVel(1.0/arcInfo[0], Kp*arcInfo[1]);
 			}
 		}
+		
+		/*private void executeMessage()
+		{
+			for()
+		}*/
 
 		// read hits from sonars and add to buffers
 		private void tryPollSonars () {
