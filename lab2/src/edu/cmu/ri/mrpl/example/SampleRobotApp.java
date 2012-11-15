@@ -1622,6 +1622,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private RingBuffer<Point2D> pointsBuffer;
 		
 		public static final boolean HAS_PARTNER = true;
+		public List<MazeState> fakeWalls = new LinkedList<MazeState>();
 
 		public MichaelPhelpsTask(TaskController tc, double maxDeviation, String mazeFileName) {
 			super(tc);
@@ -1747,6 +1748,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						mazeWorld.removeAllInits();
 						mazeWorld.addInit(goalState);
 						if (HAS_PARTNER) {
+							fakeWallsAround(goalState);
 							messaging.sendAction(Messaging.Action.GO, null);
 							transitionTo(Subtask.WAIT_FOR_PARTNER);
 						}
@@ -1768,6 +1770,35 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			robot.turnSonarsOff();
 		}
 		
+		private void fakeWallsAround (MazeState s) {
+			int x = s.x();
+			int y = s.y();
+			int dir = s.dir().ordinal();
+			for (int i = 0; i < 3; i++) {
+				fakeWall(new MazeState(x, y, Direction.values()[(dir + i) % 4]));
+			}
+		}
+		
+		private void clearFakeWalls () {
+			for (MazeState s : fakeWalls) {
+				messaging.sendAction(Messaging.Action.REMOVE_WALL, s);
+			}
+			fakeWalls.clear();
+		}
+		
+		private void fakeWall (MazeState s) {
+			if (fakeWalls.contains(s)) {
+				return;
+			}
+			else if (mazeWorld.isWall(s.x(), s.y(), s.dir())) {
+				return;
+			}
+			else {
+				fakeWalls.add(s);
+				messaging.sendAction(Messaging.Action.ADD_WALL, s);
+			}
+		}
+		
 		private void transitionTo (Subtask t) {
 			curSubtask = t;
 			
@@ -1779,7 +1810,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			//*
 			switch (t) {
 			case DROP_GOLD: 
-				SoundExample.playClips("DropIt.wav");
+				// skrillex
+				//SoundExample.playClips("DropItLonger.wav");
+				
+				// snoop dogg
+				SoundExample.playClips("snoopdrop.wav");
 				break;
 				
 			case FOLLOWPATH_GOLD_CELL:
@@ -1946,17 +1981,19 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						
 							// technique 3
 							actualOffset[2] = directSonarReadings[0] - MAGNET_DISTANCE;
-							System.out.println("first sonar: " + directSonarReadings[0]);
+							//System.out.println("first sonar: " + directSonarReadings[0]);
 							robot.updateState();
 							actualOffset[2] = actualOffset[2] + directSonarReadings[0] - MAGNET_DISTANCE;
-							System.out.println("second sonar: " + directSonarReadings[0]);
+							//System.out.println("second sonar: " + directSonarReadings[0]);
 							robot.updateState();
 							actualOffset[2] = (actualOffset[2] + directSonarReadings[0] - MAGNET_DISTANCE)/3;
-							System.out.println("third sonar: " + directSonarReadings[0]);
+							//System.out.println("third sonar: " + directSonarReadings[0]);
 							
+							/*
 							for (int i = 0; i < actualOffset.length; i++) {
 								System.out.printf("actualOffset[%d] = %.2f \n", i, actualOffset[i]);
 							}
+							//*/
 							
 							// TODO change index to change technique
 							double chosenOffset;
@@ -2080,6 +2117,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				Messaging.Action doThis = Messaging.Action.values()[Integer.parseInt(m)];
 				switch (doThis) {
 				case GO:
+					clearFakeWalls();
 					transitionTo(Subtask.START);
 					break;
 					
@@ -2091,6 +2129,16 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				case REMOVE_GOLD:
 					MazeState gold = messaging.receiveMazeState();
 					mazeWorld.removeGold(gold);
+					break;
+					
+				case ADD_WALL:
+					MazeState wall = messaging.receiveMazeState();
+					mazeWorld.addWall(wall.x(), wall.y(), wall.dir());
+					break;
+					
+				case REMOVE_WALL:
+					MazeState badWall = messaging.receiveMazeState();
+					mazeWorld.removeWall(badWall.x(), badWall.y(), badWall.dir());
 					break;
 				}
 			}

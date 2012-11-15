@@ -20,15 +20,16 @@ public class Messaging {
 	public static final String DELIM = ",";
 	
 	public enum Action {
-		REMOVE_GOLD, REMOVE_DROP, GO
+		REMOVE_GOLD, REMOVE_DROP, GO, ADD_WALL, REMOVE_WALL
 	}
 	
 	public void sendAction (Action a, MazeState s) {
 		cc.send(friend, a.ordinal() + "");
+		System.out.printf("sending %s to %s \n", a.toString(), friend);
 		if (a != Action.GO) {
 			sendMazeState(s);
+			System.out.println(s);
 		}
-		System.out.printf("sending (%s, %s) to %s \n", a.toString(), s.toString(), friend);
 	}
 	
 	public static String join (Object[] objs) {
