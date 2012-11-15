@@ -40,7 +40,7 @@ public class GradientDescent {
 			args[2] -= dtheta;
 			
 			if (debugIter && (counter % 50) == 0) {
-				System.out.printf("error @ %d: %f \n", counter, error);
+				//System.out.printf("error @ %d: %f \n", counter, error);
 			}
 
 			/*

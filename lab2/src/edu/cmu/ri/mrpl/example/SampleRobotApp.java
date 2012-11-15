@@ -1611,7 +1611,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		static final double IDEAL_GOLD_OFFSET = CELL_RADIUS - 1.4*ROBOT_RADIUS;
 		static final double MAGNET_DISTANCE = 0.5 * ROBOT_RADIUS;
 		private boolean retryGoto = false;
-		static final double RETRY_OFFSET = 0.05;
+		static final double RETRY_OFFSET = 0.0375;
 		
 		// sonar localization stuff
 		private RealPose2D lastPollPosition;
@@ -1620,6 +1620,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private static final double GRADIENT_INTERVAL = .1; // meters between running gradient descent on points
 		double[] directSonarReadings = new double[16];
 		private RingBuffer<Point2D> pointsBuffer;
+		
+		public static final boolean HAS_PARTNER = true;
 
 		public MichaelPhelpsTask(TaskController tc, double maxDeviation, String mazeFileName) {
 			super(tc);
@@ -1697,11 +1699,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					break;
 				}
 				
-				try {
-					executeMessage();
-				} catch (CommException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+				if (HAS_PARTNER) {
+					try {
+						executeMessage();
+					} catch (CommException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				}
 				
 				switch (curSubtask) {
@@ -1771,17 +1775,23 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			switch (t) {
 			case DROP_GOLD: 
 				SoundExample.playClips("DropIt.wav");
-				messaging.sendAction(Messaging.Action.GO, null);
-				transitionTo(Subtask.WAIT_FOR_PARTNER);
+				if (HAS_PARTNER) {
+					messaging.sendAction(Messaging.Action.GO, null);
+					transitionTo(Subtask.WAIT_FOR_PARTNER);
+				}
 				break;
 				
 			case FOLLOWPATH_GOLD_CELL:
 				SoundExample.playClips("speed.wav");
-				messaging.sendAction(Messaging.Action.REMOVE_GOLD, goalState);
+				if (HAS_PARTNER) {
+					messaging.sendAction(Messaging.Action.REMOVE_GOLD, goalState);
+				}
 				break;
 				
 			case FOLLOWPATH_DROP_CELL:
-				messaging.sendAction(Messaging.Action.REMOVE_DROP, goalState);
+				if (HAS_PARTNER) {
+					messaging.sendAction(Messaging.Action.REMOVE_DROP, goalState);
+				}
 				break;
 				
 			case TURNTO_PATH:
@@ -1954,7 +1964,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 								chosenOffset += RETRY_OFFSET;
 							}
 							else {
-								chosenOffset = actualOffset[2];
+								chosenOffset = actualOffset[0];
 							}
 
 							// clamp offset to work around shitty sonars/calculations
