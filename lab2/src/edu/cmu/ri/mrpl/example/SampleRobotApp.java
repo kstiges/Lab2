@@ -97,7 +97,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	PicCanvas cameraCanvas;
 	PicCanvas feedbackCanvas;
 	CommClient comm;
-	Messaging serializer;
+	Messaging messaging;
 
 	public SampleRobotApp() {
 		super("Kick Ass Sample Robot App");
@@ -421,7 +421,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					}
 				}
 			}
-			serializer = new Messaging(comm, myFriends[0]);
+			messaging = new Messaging(comm, myFriends[0]);
 		} else if ( source==turnToButton ) {
 			upcomingTasks.add(new TurnToTask(this, argument));
 			startUpcomingTasks();
@@ -1553,6 +1553,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		FOLLOWPATH_DROP_CELL, DROP_GOLD,
 		TURNTO_GOLD, TURNTO_GOLD_CHECK, TURNTO_PATH, TURNTO_DROP,
 		
+		WAIT_FOR_PARTNER,
+		
 		END_TASK // used to end the overall Task
 	}
 	
@@ -1695,9 +1697,18 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					break;
 				}
 				
-				// TODO get message(s) from partner and respond
+				try {
+					executeMessage();
+				} catch (CommException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 				
 				switch (curSubtask) {
+				case WAIT_FOR_PARTNER:
+					controller.stop();
+					break;
+					
 				case START:
 					start();
 					break;
@@ -1732,6 +1743,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						mazeWorld.removeAllInits();
 						mazeWorld.addInit(goalState);
 						transitionTo(Subtask.START);
+						// TODO send go and transition to wait
 					}
 					break;
 				}
@@ -1753,16 +1765,23 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			// debug output
 			System.err.println("-> " + t);
 			
-			// play sound clips
+			// play sound clips and send actions to partner
 			// TODO add speech back in? nah....
 			//*
 			switch (t) {
 			case DROP_GOLD: 
 				SoundExample.playClips("DropIt.wav");
+				messaging.sendAction(Messaging.Action.GO, null);
+				transitionTo(Subtask.WAIT_FOR_PARTNER);
 				break;
 				
 			case FOLLOWPATH_GOLD_CELL:
 				SoundExample.playClips("speed.wav");
+				messaging.sendAction(Messaging.Action.REMOVE_GOLD, goalState);
+				break;
+				
+			case FOLLOWPATH_DROP_CELL:
+				messaging.sendAction(Messaging.Action.REMOVE_DROP, goalState);
 				break;
 				
 			case TURNTO_PATH:
@@ -2043,10 +2062,28 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 		}
 		
-		/*private void executeMessage()
+		private void executeMessage() throws CommException
 		{
-			for()
-		}*/
+			String m;
+			while ((m = comm.getIncomingMessage()) != null) {
+				Messaging.Action doThis = Messaging.Action.values()[Integer.parseInt(m)];
+				switch (doThis) {
+				case GO:
+					transitionTo(Subtask.START);
+					break;
+					
+				case REMOVE_DROP:
+					MazeState drop = messaging.receiveMazeState();
+					mazeWorld.removeDrop(drop);
+					break;
+					
+				case REMOVE_GOLD:
+					MazeState gold = messaging.receiveMazeState();
+					mazeWorld.removeGold(gold);
+					break;
+				}
+			}
+		}
 
 		// read hits from sonars and add to buffers
 		private void tryPollSonars () {
