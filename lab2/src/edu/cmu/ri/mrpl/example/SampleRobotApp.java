@@ -1746,8 +1746,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						mazeWorld.removeDrop(goalState);
 						mazeWorld.removeAllInits();
 						mazeWorld.addInit(goalState);
-						transitionTo(Subtask.START);
-						// TODO send go and transition to wait
+						if (HAS_PARTNER) {
+							messaging.sendAction(Messaging.Action.GO, null);
+							transitionTo(Subtask.WAIT_FOR_PARTNER);
+						}
+						else {
+							transitionTo(Subtask.START);
+						}
 					}
 					break;
 				}
@@ -1775,10 +1780,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			switch (t) {
 			case DROP_GOLD: 
 				SoundExample.playClips("DropIt.wav");
-				if (HAS_PARTNER) {
-					messaging.sendAction(Messaging.Action.GO, null);
-					transitionTo(Subtask.WAIT_FOR_PARTNER);
-				}
 				break;
 				
 			case FOLLOWPATH_GOLD_CELL:

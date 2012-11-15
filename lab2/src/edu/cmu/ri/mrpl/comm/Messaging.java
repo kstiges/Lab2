@@ -28,6 +28,7 @@ public class Messaging {
 		if (a != Action.GO) {
 			sendMazeState(s);
 		}
+		System.out.printf("sending (%s, %s) to %s \n", a.toString(), s.toString(), friend);
 	}
 	
 	public static String join (Object[] objs) {
