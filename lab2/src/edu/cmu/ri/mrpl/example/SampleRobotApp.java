@@ -1774,7 +1774,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			int x = s.x();
 			int y = s.y();
 			int dir = s.dir().ordinal();
-			for (int i = 0; i < 3; i++) {
+			for (int i = 0; i < 4; i++) {
 				fakeWall(new MazeState(x, y, Direction.values()[(dir + i) % 4]));
 			}
 		}
