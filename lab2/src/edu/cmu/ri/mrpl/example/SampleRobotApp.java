@@ -1743,12 +1743,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				case DROP_GOLD:
 					// handle this inline since it's so simple
 					if (System.currentTimeMillis() - dropStartTime > 5000) {
-						hasGold = false;
-						mazeWorld.removeDrop(goalState);
-						mazeWorld.removeAllInits();
-						mazeWorld.addInit(goalState);
 						if (HAS_PARTNER) {
-							fakeWallsAround(goalState);
 							messaging.sendAction(Messaging.Action.GO, null);
 							transitionTo(Subtask.WAIT_FOR_PARTNER);
 						}
@@ -1809,6 +1804,16 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			// TODO add speech back in? nah....
 			//*
 			switch (t) {
+			case TURNTO_DROP:
+				hasGold = false;
+				mazeWorld.removeDrop(goalState);
+				mazeWorld.removeAllInits();
+				mazeWorld.addInit(goalState);
+				if (HAS_PARTNER) {
+					fakeWallsAround(goalState);
+				}
+				break;
+				
 			case DROP_GOLD: 
 				// skrillex
 				//SoundExample.playClips("DropItLonger.wav");
