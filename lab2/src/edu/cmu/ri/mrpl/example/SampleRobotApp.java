@@ -98,6 +98,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	PicCanvas feedbackCanvas;
 	CommClient comm;
 	Messaging messaging;
+	boolean timeToGo = false;
 
 	public SampleRobotApp() {
 		super("Kick Ass Sample Robot App");
@@ -123,9 +124,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 		pauseButton = new JButton("Test camera");
 		waitButton = new JButton("Setup comms");
-		turnToButton = new JButton("Turn to angle!");
+		turnToButton = new JButton("GOOOOOO"); // was "Turn to angle!"
 		goToButton = new JButton("Go to distance!");
-		poseToButton = new JButton("Go to pose!");
+		poseToButton = new JButton("twitch..."); // was "Go to pose!"
 		argumentField = new JFormattedTextField(NumberFormat.getInstance());
 		argumentField.setValue(1);
 		NumberFormat nf = NumberFormat.getInstance();
@@ -423,8 +424,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 			messaging = new Messaging(comm, myFriends[0]);
 		} else if ( source==turnToButton ) {
-			upcomingTasks.add(new TurnToTask(this, argument));
-			startUpcomingTasks();
+			//upcomingTasks.add(new TurnToTask(this, argument));
+			//startUpcomingTasks();
+			timeToGo = true;
 		} else if ( source==goToButton ) {
 			upcomingTasks.add(new GoToTask(this, argument));
 			startUpcomingTasks();
@@ -1621,7 +1623,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		double[] directSonarReadings = new double[16];
 		private RingBuffer<Point2D> pointsBuffer;
 		
-		public static final boolean HAS_PARTNER = true;
+		public static final boolean HAS_PARTNER = false;
 		public List<MazeState> fakeWalls = new LinkedList<MazeState>();
 
 		public MichaelPhelpsTask(TaskController tc, double maxDeviation, String mazeFileName) {
@@ -1683,6 +1685,33 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			curPose = perceptor.getCorrectedPose();
 			lastPollPosition = curPose;
 			lastGradientPosition = curPose;
+			
+			controller.setVel(0.1, 0.1);
+			try {
+				Thread.sleep(50);
+			} catch (InterruptedException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			controller.setVel(-0.1, -0.1);
+			try {
+				Thread.sleep(50);
+			} catch (InterruptedException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			controller.stop();
+			
+			
+			speech.speak("ready");
+			while(!timeToGo) {
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
 
 			// stopping handled by START subtask method
 			// which transitions to END_TASK if there are no more golds
