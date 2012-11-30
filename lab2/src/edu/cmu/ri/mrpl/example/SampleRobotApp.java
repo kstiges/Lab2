@@ -1577,7 +1577,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private MazeGraphics mazeGraphics;
 		private JFrame wrapper;
 		
-		private Subtask curSubtask = Subtask.START;
+		private Subtask curSubtask = IS_FIRST_PARTNER ? Subtask.START : Subtask.WAIT_FOR_PARTNER;
 		
 		// used in Subtasks GOTO_GOLD_WALL, GO_FROM_GOLD_WALL
 		private MazeState goalState;
