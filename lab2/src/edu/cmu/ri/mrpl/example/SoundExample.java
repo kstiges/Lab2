@@ -77,6 +77,11 @@ class SoundExample{
 	}
 	
 	public static void playClips (final String names) {
+		boolean playSounds = false;
+		if (!playSounds) {
+			return;
+		}
+		
 		final String[] splits = names.split(" ");
 		new Thread(new Runnable(){
 			public void run () {
@@ -85,6 +90,7 @@ class SoundExample{
 				}
 			}
 		}).start();
+
 	}
 	
 	public static void main(String[] argv){

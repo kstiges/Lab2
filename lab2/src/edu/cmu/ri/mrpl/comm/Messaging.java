@@ -26,7 +26,7 @@ public class Messaging {
 	public void sendAction (Action a, MazeState s) {
 		cc.send(friend, a.ordinal() + "");
 		System.out.printf("sending %s to %s \n", a.toString(), friend);
-		if (a != Action.GO) {
+		if (a != Action.GO || a != Action.TAKE_CHARGE) {
 			sendMazeState(s);
 			System.out.println(s);
 		}

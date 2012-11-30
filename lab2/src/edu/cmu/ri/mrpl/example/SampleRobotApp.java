@@ -384,7 +384,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		} else if ( source==waitButton ) {
 //			upcomingTasks.add(new WaitTask(this, argument));
 //			startUpcomingTasks();
-			comm = new CommClient("128.237.244.165");
+			comm = new CommClient("128.237.236.81");
 			
 			//commclient test stuff
 			String myName = "SinNombre_" + IS_FIRST_PARTNER;
