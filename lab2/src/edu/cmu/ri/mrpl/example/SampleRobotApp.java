@@ -1623,7 +1623,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		double[] directSonarReadings = new double[16];
 		private RingBuffer<Point2D> pointsBuffer;
 		
+		// change these depending on which robot it is
 		public static final boolean HAS_PARTNER = false;
+		private boolean inCharge = true; // whether or not we can edit ours/partners maze
+		private long inChargeSince = System.currentTimeMillis();
+		public static final long IN_CHARGE_DURATION = 1000;
+		private boolean partnerAwol = false;
+		public static final long PARTNER_AWOL_TIMEOUT = 5*IN_CHARGE_DURATION;
 		public List<MazeState> fakeWalls = new LinkedList<MazeState>();
 
 		public MichaelPhelpsTask(TaskController tc, double maxDeviation, String mazeFileName) {
@@ -1721,7 +1727,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				curPose = perceptor.getCorrectedPose();
 				
 				tryPollSonars();
-				tryDescendPose();				
+				tryDescendPose();		
+				trySendTakeCharge();
 				updateGraphics(contBotList);
 				
 				// end the task if requested
@@ -2174,6 +2181,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					MazeState badWall = messaging.receiveMazeState();
 					mazeWorld.removeWall(badWall.x(), badWall.y(), badWall.dir());
 					break;
+					
+				case TAKE_CHARGE:
+					inCharge = true;
+					inChargeSince = System.currentTimeMillis();
+					speech.speak("me");
+					break;
 				}
 			}
 		}
@@ -2210,6 +2223,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				
 				// Clear the points buffer
 				pointsBuffer.clear();
+			}
+		}
+		
+		private void trySendTakeCharge() {
+			if (System.currentTimeMillis() - IN_CHARGE_DURATION > inChargeSince) {
+				messaging.sendAction(Messaging.Action.TAKE_CHARGE, null);
+				inCharge = false;
 			}
 		}
 		

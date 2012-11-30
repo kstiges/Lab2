@@ -20,7 +20,7 @@ public class Messaging {
 	public static final String DELIM = ",";
 	
 	public enum Action {
-		REMOVE_GOLD, REMOVE_DROP, GO, ADD_WALL, REMOVE_WALL
+		REMOVE_GOLD, REMOVE_DROP, GO, ADD_WALL, REMOVE_WALL, TAKE_CHARGE
 	}
 	
 	public void sendAction (Action a, MazeState s) {
