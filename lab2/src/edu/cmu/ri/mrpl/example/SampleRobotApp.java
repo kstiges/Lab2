@@ -2227,7 +2227,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void trySendTakeCharge() {
-			if (System.currentTimeMillis() - IN_CHARGE_DURATION > inChargeSince) {
+			if (inCharge && System.currentTimeMillis() - IN_CHARGE_DURATION > inChargeSince) {
 				messaging.sendAction(Messaging.Action.TAKE_CHARGE, null);
 				inCharge = false;
 			}
