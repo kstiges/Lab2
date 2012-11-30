@@ -57,6 +57,9 @@ import static edu.cmu.ri.mrpl.RobotModel.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
 
+	public static final boolean HAS_PARTNER = true;
+	public static final boolean IS_FIRST_PARTNER = true;
+	
 	private Robot robot;
 	private SonarConsole sc;
 
@@ -384,8 +387,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			comm = new CommClient("128.237.244.165");
 			
 			//commclient test stuff
-			String myName = "SinNombreB";
-			String myFriends[] = {"SinNombreA"};
+			String myName = "SinNombre_" + IS_FIRST_PARTNER;
+			String myFriends[] = {"SinNombre_" + !IS_FIRST_PARTNER};
 
 			//*
 			try{
@@ -1623,11 +1626,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		double[] directSonarReadings = new double[16];
 		private RingBuffer<Point2D> pointsBuffer;
 		
-		// change these depending on which robot it is
-		public static final boolean HAS_PARTNER = false;
-		private boolean inCharge = true; // whether or not we can edit ours/partners maze
+		// whether or not we can edit ours/partners maze
+		private boolean inCharge = IS_FIRST_PARTNER;
 		private long inChargeSince = System.currentTimeMillis();
 		public static final long IN_CHARGE_DURATION = 1000;
+		// TODO get this working if it could be a problem
 		private boolean partnerAwol = false;
 		public static final long PARTNER_AWOL_TIMEOUT = 5*IN_CHARGE_DURATION;
 		public List<MazeState> fakeWalls = new LinkedList<MazeState>();
