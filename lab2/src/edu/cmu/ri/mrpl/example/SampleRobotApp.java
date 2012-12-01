@@ -1561,8 +1561,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		FOLLOWPATH_DROP_CELL, DROP_GOLD,
 		TURNTO_GOLD, TURNTO_GOLD_CHECK, TURNTO_PATH, TURNTO_DROP,
 		
-		WAIT_FOR_PARTNER,
-		
 		END_TASK // used to end the overall Task
 	}
 	
@@ -1581,7 +1579,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private MazeGraphics mazeGraphics;
 		private JFrame wrapper;
 		
-		private Subtask curSubtask = IS_FIRST_PARTNER ? Subtask.START : Subtask.WAIT_FOR_PARTNER;
+		private Subtask curSubtask = Subtask.START;
 		
 		// used in Subtasks GOTO_GOLD_WALL, GO_FROM_GOLD_WALL
 		private MazeState goalState;
@@ -1755,11 +1753,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					}
 				}
 				
-				switch (curSubtask) {
-				case WAIT_FOR_PARTNER:
-					controller.stop();
-					break;
-					
+				switch (curSubtask) {					
 				case START:
 					if (inCharge) {
 						start();
@@ -1786,15 +1780,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				case DROP_GOLD:
 					// handle this inline since it's so simple
 					if (System.currentTimeMillis() - dropStartTime > 5000) {
-						if (HAS_PARTNER) {
-							if (inCharge) {
-								messaging.sendAction(Messaging.Action.GO, null);
-								transitionTo(Subtask.WAIT_FOR_PARTNER);
-							}
-						}
-						else {
-							transitionTo(Subtask.START);
-						}
+						transitionTo(Subtask.START);
 					}
 					break;
 				}
@@ -1859,11 +1845,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			// play sound clips and send actions to partner
 			//*
-			switch (t) {
-			case WAIT_FOR_PARTNER:
-				transitionTo(Subtask.START);
-				break;
-				
+			switch (t) {				
 			case TURNTO_DROP:
 				hasGold = false;
 				mazeWorld.removeDrop(goalState);
@@ -2218,12 +2200,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			String m;
 			while ((m = comm.getIncomingMessage()) != null) {
 				Messaging.Action doThis = Messaging.Action.values()[Integer.parseInt(m)];
-				switch (doThis) {
-				case GO:
-					clearFakeWalls();
-					transitionTo(Subtask.START);
-					break;
-					
+				switch (doThis) {					
 				case REMOVE_DROP:
 					MazeState drop = messaging.receiveMazeState();
 					mazeWorld.removeDrop(drop);

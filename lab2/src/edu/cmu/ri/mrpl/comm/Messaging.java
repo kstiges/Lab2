@@ -20,13 +20,13 @@ public class Messaging {
 	public static final String DELIM = ",";
 	
 	public enum Action {
-		REMOVE_GOLD, REMOVE_DROP, GO, ADD_WALL, REMOVE_WALL, TAKE_CHARGE
+		REMOVE_GOLD, REMOVE_DROP, ADD_WALL, REMOVE_WALL, TAKE_CHARGE
 	}
 	
 	public void sendAction (Action a, MazeState s) {
 		cc.send(friend, a.ordinal() + "");
 		System.out.printf("sending %s to %s \n", a.toString(), friend);
-		if (a != Action.GO && a != Action.TAKE_CHARGE) {
+		if (a != Action.TAKE_CHARGE) {
 			sendMazeState(s);
 			System.out.println(s);
 		}
