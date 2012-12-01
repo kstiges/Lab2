@@ -455,6 +455,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			startUpcomingTasks();
 		} else if ( source==solveMazeButton ) {
+			turnToButton.requestFocusInWindow();
 			JFileChooser chooser = new MazeFileChooser();
 			int returnVal = chooser.showOpenDialog(this);
 			if(returnVal == JFileChooser.APPROVE_OPTION) {
@@ -1877,6 +1878,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				SoundExample.playClips("speed.wav");
 				if (HAS_PARTNER) {
 					messaging.sendAction(Messaging.Action.REMOVE_GOLD, goalState);
+					speech.speak("remove gold");
 				}
 				break;
 				
@@ -2193,6 +2195,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				case REMOVE_GOLD:
 					MazeState gold = messaging.receiveMazeState();
 					mazeWorld.removeGold(gold);
+					speech.speak("gold gone");
 					break;
 					
 				case ADD_WALL:
