@@ -1926,6 +1926,16 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			// set up for TURNTO the first pose orientation
 			destAngle = poses.get(0).getTh();
 			transitionTo(Subtask.TURNTO_PATH);
+
+			// remove destination from partner's golds or drops
+			if (hasGold) {
+				// remove drop
+				messaging.sendAction(Messaging.Action.REMOVE_DROP, goalState);
+			}
+			else {
+				// remove gold
+				messaging.sendAction(Messaging.Action.REMOVE_GOLD, goalState);
+			}
 		}
 		
 		private void setupGotoHelper (double xOffset) {
@@ -2018,14 +2028,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				if (perceptor.getSpeed() == 0) {
 					switch (curSubtask) {
 					case TURNTO_PATH:
-						if (inCharge) {
 							if (hasGold) {
 								transitionTo(Subtask.FOLLOWPATH_DROP_CELL);
 							}
 							else {
 								transitionTo(Subtask.FOLLOWPATH_GOLD_CELL);
 							}
-						}
 						break;
 						
 					case TURNTO_GOLD:
@@ -2097,7 +2105,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 								retryGoto = false;
 							}
 							else {
-								// TODO try to grab again? NOPE
 								retryGoto = true;
 								// same conversation as MazeLocalizer.mazeStateToWorldPose
 								destAngle = goalState.dir().ordinal() * PI/2;
@@ -2159,14 +2166,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					stopping = false;
 					// same conversation as MazeLocalizer.mazeStateToWorldPose
 					destAngle = goalState.dir().ordinal() * PI/2;
-					if (inCharge) {
-						if (hasGold) {
-							transitionTo(Subtask.TURNTO_DROP);
-						}
-						else {
-							//speech.speak("searching");
-							transitionTo(Subtask.TURNTO_GOLD);
-						}
+					if (hasGold) {
+						transitionTo(Subtask.TURNTO_DROP);
+					}
+					else {
+						//speech.speak("searching");
+						transitionTo(Subtask.TURNTO_GOLD);
 					}
 				}
 			}
