@@ -2170,6 +2170,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			if (stopping || pathSegments.size() == 0 || (segment == pathSegments.size() - 1
 					&& distToEnd < 0.80*perceptor.getSpeed() || distToEnd < 0.05)) {
 				//stopping = true;
+				clearFakeWalls();
 				controller.stop();
 				if (perceptor.getSpeed() == 0) {
 					stopping = false;
