@@ -420,7 +420,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						if(e1.getMessage().startsWith("friends-ready"))
 							friendsReady = true;
 						else{
-							//Again, anything except freinds-ready is not handled.
+							//Again, anything except friends-ready is not handled.
 							System.err.println("Giving up");
 							return;
 						}
@@ -1821,6 +1821,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void clearFakeWalls () {
+			if (!HAS_PARTNER) {
+				return;
+			}
 			for (MazeState s : fakeWalls) {
 				messaging.sendAction(Messaging.Action.REMOVE_WALL, s);
 			}
@@ -1828,6 +1831,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void fakeWall(MazeState s) {
+			if (!HAS_PARTNER) {
+				return;
+			}
 			if (fakeWalls.contains(s)) {
 				return;
 			}
@@ -1858,9 +1864,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				mazeWorld.removeDrop(goalState);
 				mazeWorld.removeAllInits();
 				mazeWorld.addInit(goalState);
-				if (HAS_PARTNER) {
-					fakeWallsAround(goalState);
-				}
+				fakeWallsAround(goalState);
 				break;
 				
 			case DROP_GOLD: 
@@ -1889,6 +1893,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			case TURNTO_GOLD:
 				SoundExample.playClips("golddigga.wav");
+				fakeWallsAround(goalState);
 				break;
 			}
 			//*/
@@ -1900,7 +1905,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				//transitionTo(Subtask.END_TASK);
 				// in order to get the partner to END_TASK
 				//messaging.sendAction(Messaging.Action.GO, null);
-				messaging.sendAction(Messaging.Action.TAKE_CHARGE, null);
+				if (HAS_PARTNER) {
+					messaging.sendAction(Messaging.Action.TAKE_CHARGE, null);
+				}
 				controller.stop();
 				robot.turnSonarsOff();
 			}
@@ -1915,7 +1922,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				speech.speak("not in charge");
 			}
 			
-			System.err.println("setupPathHelper: hasGold = " + hasGold);
+			//System.err.println("setupPathHelper: hasGold = " + hasGold);
 			java.util.List<RealPose2D> poses;
 			// find next gold
 			List<MazeState> states = new MazeSolver(mazeWorld).findPath(!hasGold);
@@ -1938,13 +1945,15 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			transitionTo(Subtask.TURNTO_PATH);
 
 			// remove destination from partner's golds or drops
-			if (hasGold) {
-				// remove drop
-				messaging.sendAction(Messaging.Action.REMOVE_DROP, goalState);
-			}
-			else {
-				// remove gold
-				messaging.sendAction(Messaging.Action.REMOVE_GOLD, goalState);
+			if (HAS_PARTNER) {
+				if (hasGold) {
+					// remove drop
+					messaging.sendAction(Messaging.Action.REMOVE_DROP, goalState);
+				}
+				else {
+					// remove gold
+					messaging.sendAction(Messaging.Action.REMOVE_GOLD, goalState);
+				}
 			}
 		}
 		
@@ -2171,9 +2180,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			if (stopping || pathSegments.size() == 0 || (segment == pathSegments.size() - 1
 					&& distToEnd < 0.80*perceptor.getSpeed() || distToEnd < 0.05)) {
 				//stopping = true;
-				clearFakeWalls();
 				controller.stop();
 				if (perceptor.getSpeed() == 0) {
+					clearFakeWalls();
 					stopping = false;
 					// same conversation as MazeLocalizer.mazeStateToWorldPose
 					destAngle = goalState.dir().ordinal() * PI/2;
@@ -2268,7 +2277,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void trySendTakeCharge() {
-			if (inCharge && System.currentTimeMillis() - IN_CHARGE_DURATION > inChargeSince) {
+			if (HAS_PARTNER && inCharge && System.currentTimeMillis() - IN_CHARGE_DURATION > inChargeSince) {
 				messaging.sendAction(Messaging.Action.TAKE_CHARGE, null);
 				inCharge = false;
 			}
