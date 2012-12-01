@@ -1805,6 +1805,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			robot.turnSonarsOff();
 		}
 		
+		private void fakeWallsAroundWaypoints(List<MazeState> waypoints) {
+			for (MazeState s : waypoints) {
+				fakeWallsAround(s);
+			}
+		}
+		
 		private void fakeWallsAround (MazeState s) {
 			int x = s.x();
 			int y = s.y();
@@ -1867,10 +1873,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				
 			case FOLLOWPATH_GOLD_CELL:
 				SoundExample.playClips("speed.wav");
-				if (HAS_PARTNER) {
-					messaging.sendAction(Messaging.Action.REMOVE_GOLD, goalState);
-					speech.speak("gold");
-				}
 				break;
 				
 			case FOLLOWPATH_DROP_CELL:
@@ -1906,11 +1908,24 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 		}
 		
+		// should only be called if we're inCharge
 		private void setupPathHelper () {
+			if (!inCharge) {
+				speech.speak("not in charge");
+			}
+			
 			System.err.println("setupPathHelper: hasGold = " + hasGold);
 			java.util.List<RealPose2D> poses;
 			// find next gold
 			List<MazeState> states = new MazeSolver(mazeWorld).findPath(!hasGold);
+			
+			// if we didn't find a path, return
+			// will get called again once we're inCharge
+			if (states == null) {
+				return;
+			}
+			
+			fakeWallsAroundWaypoints(states);
 			String commands = MazeSolver.statesToCommandsString(states);
 			System.out.println(commands);
 			goalState = states.get(states.size() - 1);
