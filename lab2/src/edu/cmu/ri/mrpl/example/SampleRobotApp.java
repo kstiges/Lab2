@@ -1,5 +1,10 @@
-// XXX TODO add in error correction, return-to-path functionality,
-// and end of followpath behavior
+/* XXX TODO
+ * remove fake walls behind us as we travel along path
+ * maybe replan on the fly
+ * stopping/turning sloppiness when not toward gold
+ * turn to gold check should turn towards the next drop (but don't reserve/remove it)
+ * adjust path following to account for carpet
+ */
 
 package edu.cmu.ri.mrpl.example;
 /*
