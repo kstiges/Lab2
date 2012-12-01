@@ -1878,7 +1878,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				SoundExample.playClips("speed.wav");
 				if (HAS_PARTNER) {
 					messaging.sendAction(Messaging.Action.REMOVE_GOLD, goalState);
-					speech.speak("remove gold");
+					speech.speak("gold");
 				}
 				break;
 				
@@ -2200,7 +2200,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				case REMOVE_GOLD:
 					MazeState gold = messaging.receiveMazeState();
 					mazeWorld.removeGold(gold);
-					speech.speak("gold gone");
 					break;
 					
 				case ADD_WALL:
@@ -2216,7 +2215,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				case TAKE_CHARGE:
 					inCharge = true;
 					inChargeSince = System.currentTimeMillis();
-					//speech.speak("me");
+					speech.speak("me");
 					break;
 				}
 			}
