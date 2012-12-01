@@ -1597,6 +1597,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private static final double LOOKAHEAD_DISTANCE = 1;
 		private Point2D lookaheadPointRelWorld;
 		private boolean stopping = false;
+		// used when no paths can be found
+		private boolean playMoveBitch = true;
+		private final String moveBitchClip = "move_bitch.wav";
+		private final String getOutTheWayClip = "get_out_tha_way.wav";
+		private String currentBitchClip = moveBitchClip;
 		
 		// turn to stuff
 		// used in Subtask TURNTO
@@ -1930,6 +1935,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			// if we didn't find a path, return
 			// will get called again once we're inCharge
 			if (states == null) {
+				if (playMoveBitch) {
+					playMoveBitch = false;
+					SoundExample.playClips(currentBitchClip);
+					currentBitchClip = currentBitchClip == moveBitchClip
+							? getOutTheWayClip
+							: moveBitchClip;
+				}
 				return;
 			}
 			
@@ -2234,6 +2246,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					
 				case TAKE_CHARGE:
 					inCharge = true;
+					playMoveBitch = true;
 					inChargeSince = System.currentTimeMillis();
 					//speech.speak("me");
 					break;
