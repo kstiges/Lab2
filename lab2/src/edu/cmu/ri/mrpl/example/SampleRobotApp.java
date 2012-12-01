@@ -50,6 +50,7 @@ import edu.cmu.ri.mrpl.util.Cooperation;
 import edu.cmu.ri.mrpl.util.GradientDescent;
 import edu.cmu.ri.mrpl.util.GradientDescent.WallPointFitter;
 import edu.cmu.ri.mrpl.util.Lookahead;
+import edu.cmu.ri.mrpl.util.MazeFileChooser;
 import edu.cmu.ri.mrpl.util.RingBuffer;
 import edu.cmu.ri.mrpl.util.GradientDescent.ErrorFunction;
 import static java.lang.Math.*;
@@ -453,7 +454,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			startUpcomingTasks();
 		} else if ( source==solveMazeButton ) {
-			JFileChooser chooser = new JFileChooser();
+			JFileChooser chooser = new MazeFileChooser();
 			int returnVal = chooser.showOpenDialog(this);
 			if(returnVal == JFileChooser.APPROVE_OPTION) {
 				String mazeFileName = chooser.getSelectedFile().getAbsolutePath();

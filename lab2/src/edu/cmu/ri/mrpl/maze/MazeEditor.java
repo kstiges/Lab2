@@ -11,6 +11,7 @@ import edu.cmu.ri.mrpl.maze.MazeGraphics;
 import edu.cmu.ri.mrpl.maze.MazeGraphicsSwing;
 import edu.cmu.ri.mrpl.maze.MazeState;
 import edu.cmu.ri.mrpl.maze.MazeWorld;
+import edu.cmu.ri.mrpl.util.MazeFileChooser;
 
 import java.io.*;
 
@@ -144,25 +145,7 @@ public class MazeEditor extends JFrame {
       resizeDialog = new ResizeDialog(this);
       resizeDialog.pack();
 
-      fileChooser = new JFileChooser();
-
-      javax.swing.filechooser.FileFilter mazeFilter = new javax.swing.filechooser.FileFilter() {
-	public boolean accept(File file) {
-	  if (file.isDirectory())
-	    return true;
-
-	  return file.getName().endsWith(".maze");
-	}
-
-	public String getDescription() {
-	  return "Maze files (*.maze)";
-	}
-      };
-
-
-      fileChooser.addChoosableFileFilter(mazeFilter);
-      fileChooser.setFileFilter(mazeFilter);
-
+      fileChooser = new MazeFileChooser();
       // attach listeners
       this.addWindowListener(new WindowAdapter() {
 	public void windowClosing(WindowEvent e) {
