@@ -489,7 +489,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					upcomingTasks.add(new TurnToTask(this, Angle.normalize(theta)));
 					
 					// follow the path
-					// TODO switched these for testing
+					// switched these for testing
 					//upcomingTasks.add(new SolveMazeTask(this, 0.1, mazeFileName));
 					upcomingTasks.add(new MichaelPhelpsTask(this, 0.1, mazeFileName));
 					
@@ -1413,7 +1413,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			RealPose2D curPose = perceptor.getCorrectedPose();
 			
-			// TODO: Look at my comment below using this same garbage...
+			// Look at my comment below using this same garbage...
 			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
 			
 			RealPose2D lastPollPosition = perceptor.getCorrectedPose();
@@ -1500,7 +1500,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					((SimRobot) robot).deleteObstacle(tmp.getX(), tmp.getY());
 				}
 				
-				// TODO: Make this right...so essentially what I'm doing here is subtracting half of the width of a cell from the X and Y of this correctedPose because
+				// Make this right...so essentially what I'm doing here is subtracting half of the width of a cell from the X and Y of this correctedPose because
 				// it should have been at 0,0 when it was saying .3683, .3683
 				// It's late and I can't wrap my brain around the needed transform so I just did this and it seems to work except the robot has become "sloppy" now
 				// instead of the nice smooth runs we had in Lab 4
@@ -1692,7 +1692,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			RealPose2D rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
 			contBotList.add(new ContRobot(rawPosition, Color.RED));
 			contBotList.add(new ContRobot(correctedPosition, Color.GREEN));
-			// TODO add robot used for lookahead point if needed
+			// add robot used for lookahead point if needed
 			//contBotList.add(new ContRobot(new RealPose2D(0,0,0), new Color(0f, 0f, 1f, 0.5f)));
 			mazeGraphics.setContRobots(contBotList);
 			
@@ -1704,14 +1704,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			try {
 				Thread.sleep(50);
 			} catch (InterruptedException e1) {
-				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
 			controller.setVel(-0.1, -0.1);
 			try {
 				Thread.sleep(50);
 			} catch (InterruptedException e1) {
-				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
 			controller.stop();
@@ -1722,7 +1720,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				try {
 					Thread.sleep(100);
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}
@@ -1748,7 +1745,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					try {
 						executeMessage();
 					} catch (CommException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 						System.exit(1);
 					}
@@ -1778,15 +1774,10 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					break;
 					
 				case GOTO_GOLD_WALL:
-					// XXX debug
-					//curSubtask = Subtask.GO_FROM_GOLD_WALL;
-					//break;
 				case GO_FROM_GOLD_WALL:
 					goTo();
-					// XXX debug
-					//destAngle = Angle.normalize(curPose.getTh() + PI/2);
-					//transitionTo(Subtask.TURNTO_GOLD_CHECK);
 					break;
+					
 				case DROP_GOLD:
 					// handle this inline since it's so simple
 					if (System.currentTimeMillis() - dropStartTime > 5000) {
@@ -1903,9 +1894,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		
 		private void start() {
 			if (mazeWorld.getFreeGolds().isEmpty()) {
-				transitionTo(Subtask.END_TASK);
+				// XXX might not work
+				//transitionTo(Subtask.END_TASK);
 				// in order to get the partner to END_TASK
-				messaging.sendAction(Messaging.Action.GO, null);
+				//messaging.sendAction(Messaging.Action.GO, null);
+				messaging.sendAction(Messaging.Action.TAKE_CHARGE, null);
+				controller.stop();
 			}
 			else {
 				setupPathHelper();
@@ -2150,7 +2144,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void followPath() {
-			final double Kp = 1;// TODO switch between 1.2 and 2
+			final double Kp = 1;// switch between 1.2 and 2
 			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
 			RealPoint2D tmp = new RealPoint2D();
 			int segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
@@ -2271,7 +2265,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				contBotList.get(0).pose.setPose(rawPosition.getX(), rawPosition.getY(), rawPosition.getTh()*PI/2);
 				contBotList.get(1).pose.setPose(correctedPosition.getX(), correctedPosition.getY(), correctedPosition.getTh()*PI/2);
 				if (lookaheadPointRelWorld != null) {
-					// TODO use this to debug lookahead if needed
+					// use this to debug lookahead if needed
 					//contBotList.get(2).pose.setPose(lookaheadPointRelWorld.getX(), lookaheadPointRelWorld.getY(), 0);
 				}
 			}
