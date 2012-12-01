@@ -1902,6 +1902,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				//messaging.sendAction(Messaging.Action.GO, null);
 				messaging.sendAction(Messaging.Action.TAKE_CHARGE, null);
 				controller.stop();
+				robot.turnSonarsOff();
 			}
 			else {
 				setupPathHelper();
