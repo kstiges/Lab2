@@ -1759,7 +1759,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					break;
 					
 				case START:
-					start();
+					if (inCharge) {
+						start();
+					}
 					break;
 					
 				case FOLLOWPATH_GOLD_CELL:
@@ -1847,9 +1849,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			System.err.println("-> " + t);
 			
 			// play sound clips and send actions to partner
-			// TODO add speech back in? nah....
 			//*
 			switch (t) {
+			case WAIT_FOR_PARTNER:
+				transitionTo(Subtask.START);
+				break;
+				
 			case TURNTO_DROP:
 				hasGold = false;
 				mazeWorld.removeDrop(goalState);
@@ -2079,30 +2084,32 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						break;
 						
 					case TURNTO_GOLD_CHECK:
-						if (checkForBlue(cam)) {
-							hasGold = true;
-							mazeWorld.removeGold(goalState);
-							mazeWorld.removeAllInits();
-							mazeWorld.addInit(goalState);
-							//speech.speak("success, moving");
-							setupPathHelper();
-							retryGoto = false;
-						}
-						else {
-							// TODO try to grab again? NOPE
-							retryGoto = true;
-							// same conversation as MazeLocalizer.mazeStateToWorldPose
-							destAngle = goalState.dir().ordinal() * PI/2;
-							transitionTo(Subtask.TURNTO_GOLD);
-							/*
-							hasGold = false;
-							mazeWorld.removeGold(goalState);
-							mazeWorld.removeAllInits();
-							mazeWorld.addInit(goalState);
-							goalState = null;
-							//speech.speak("failure, skipping");
-							transitionTo(Subtask.START);
-							*/
+						if (inCharge) {
+							if (checkForBlue(cam)) {
+								hasGold = true;
+								mazeWorld.removeGold(goalState);
+								mazeWorld.removeAllInits();
+								mazeWorld.addInit(goalState);
+								//speech.speak("success, moving");
+								setupPathHelper();
+								retryGoto = false;
+							}
+							else {
+								// TODO try to grab again? NOPE
+								retryGoto = true;
+								// same conversation as MazeLocalizer.mazeStateToWorldPose
+								destAngle = goalState.dir().ordinal() * PI/2;
+								transitionTo(Subtask.TURNTO_GOLD);
+								/*
+								hasGold = false;
+								mazeWorld.removeGold(goalState);
+								mazeWorld.removeAllInits();
+								mazeWorld.addInit(goalState);
+								goalState = null;
+								//speech.speak("failure, skipping");
+								transitionTo(Subtask.START);
+								*/
+							}
 						}
 						break;
 						
