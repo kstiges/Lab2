@@ -1788,8 +1788,10 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					// handle this inline since it's so simple
 					if (System.currentTimeMillis() - dropStartTime > 5000) {
 						if (HAS_PARTNER) {
-							messaging.sendAction(Messaging.Action.GO, null);
-							transitionTo(Subtask.WAIT_FOR_PARTNER);
+							if (!inCharge) {
+								messaging.sendAction(Messaging.Action.GO, null);
+								transitionTo(Subtask.WAIT_FOR_PARTNER);
+							}
 						}
 						else {
 							transitionTo(Subtask.START);
@@ -2009,11 +2011,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				if (perceptor.getSpeed() == 0) {
 					switch (curSubtask) {
 					case TURNTO_PATH:
-						if (hasGold) {
-							transitionTo(Subtask.FOLLOWPATH_DROP_CELL);
-						}
-						else {
-							transitionTo(Subtask.FOLLOWPATH_GOLD_CELL);
+						if (inCharge) {
+							if (hasGold) {
+								transitionTo(Subtask.FOLLOWPATH_DROP_CELL);
+							}
+							else {
+								transitionTo(Subtask.FOLLOWPATH_GOLD_CELL);
+							}
 						}
 						break;
 						
@@ -2146,12 +2150,14 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					stopping = false;
 					// same conversation as MazeLocalizer.mazeStateToWorldPose
 					destAngle = goalState.dir().ordinal() * PI/2;
-					if (hasGold) {
-						transitionTo(Subtask.TURNTO_DROP);
-					}
-					else {
-						//speech.speak("searching");
-						transitionTo(Subtask.TURNTO_GOLD);
+					if (inCharge) {
+						if (hasGold) {
+							transitionTo(Subtask.TURNTO_DROP);
+						}
+						else {
+							//speech.speak("searching");
+							transitionTo(Subtask.TURNTO_GOLD);
+						}
 					}
 				}
 			}
@@ -2195,7 +2201,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				case TAKE_CHARGE:
 					inCharge = true;
 					inChargeSince = System.currentTimeMillis();
-					speech.speak("me");
+					//speech.speak("me");
 					break;
 				}
 			}
