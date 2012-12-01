@@ -1788,7 +1788,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					// handle this inline since it's so simple
 					if (System.currentTimeMillis() - dropStartTime > 5000) {
 						if (HAS_PARTNER) {
-							if (!inCharge) {
+							if (inCharge) {
 								messaging.sendAction(Messaging.Action.GO, null);
 								transitionTo(Subtask.WAIT_FOR_PARTNER);
 							}
