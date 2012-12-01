@@ -1864,12 +1864,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				
 			case FOLLOWPATH_GOLD_CELL:
 				SoundExample.playClips("speed.wav");
+				currentBitchClip = moveBitchClip;
 				break;
 				
 			case FOLLOWPATH_DROP_CELL:
-				if (HAS_PARTNER) {
-					messaging.sendAction(Messaging.Action.REMOVE_DROP, goalState);
-				}
+				currentBitchClip = moveBitchClip;
 				break;
 				
 			case TURNTO_PATH:
