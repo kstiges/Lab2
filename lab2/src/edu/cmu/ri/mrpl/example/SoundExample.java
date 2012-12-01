@@ -77,7 +77,7 @@ class SoundExample{
 	}
 	
 	public static void playClips (final String names) {
-		boolean playSounds = false;
+		boolean playSounds = true;
 		if (!playSounds) {
 			return;
 		}

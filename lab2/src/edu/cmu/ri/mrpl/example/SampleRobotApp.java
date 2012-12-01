@@ -2225,7 +2225,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				case TAKE_CHARGE:
 					inCharge = true;
 					inChargeSince = System.currentTimeMillis();
-					speech.speak("me");
+					//speech.speak("me");
 					break;
 				}
 			}
