@@ -369,7 +369,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 		if (source==connectButton) {
 			connect();
-			solveMazeButton.requestFocusInWindow();
+			waitButton.requestFocusInWindow();
 		} else if ( source==disconnectButton ) {
 			disconnect();
 		} else if ( source==stopButton ) {
@@ -385,6 +385,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		} else if ( source==waitButton ) {
 //			upcomingTasks.add(new WaitTask(this, argument));
 //			startUpcomingTasks();
+			solveMazeButton.requestFocusInWindow();
 			comm = new CommClient("128.237.236.81");
 			
 			//commclient test stuff
