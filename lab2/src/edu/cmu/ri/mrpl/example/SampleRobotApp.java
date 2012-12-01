@@ -1575,6 +1575,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private MazeLocalizer correctedLocalizer;
 		private MazeLocalizer rawLocalizer;
 		private MazeWorld mazeWorld;
+		private MazeWorld originalMazeWorld; // doesn't have fake walls
 		private MazeGraphics mazeGraphics;
 		private JFrame wrapper;
 		
@@ -1641,6 +1642,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			
 			try {
 				mazeWorld = new MazeWorld(mazeFileName);
+				originalMazeWorld = new MazeWorld(mazeWorld);
 			} catch (IOException e) {
 				System.err.println("Couldn't read maze file!");
 			}
@@ -1746,6 +1748,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					} catch (CommException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
+						System.exit(1);
 					}
 				}
 				
@@ -1821,11 +1824,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			fakeWalls.clear();
 		}
 		
-		private void fakeWall (MazeState s) {
+		private void fakeWall(MazeState s) {
 			if (fakeWalls.contains(s)) {
 				return;
 			}
-			else if (mazeWorld.isWall(s.x(), s.y(), s.dir())) {
+			else if (originalMazeWorld.isWall(s.x(), s.y(), s.dir())) {
 				return;
 			}
 			else {
@@ -1891,6 +1894,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private void start() {
 			if (mazeWorld.getFreeGolds().isEmpty()) {
 				transitionTo(Subtask.END_TASK);
+				// in order to get the partner to END_TASK
+				messaging.sendAction(Messaging.Action.GO, null);
 			}
 			else {
 				setupPathHelper();
