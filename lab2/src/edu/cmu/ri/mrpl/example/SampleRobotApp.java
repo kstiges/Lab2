@@ -890,6 +890,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			if (!HAS_PARTNER) {
 				return;
 			}
+			if (!fakeWalls.contains(s)) {
+				return;
+			}
+			else if (originalMazeWorld.isWall(s.x(), s.y(), s.dir())) {
+				return;
+			}
 			messaging.sendAction(Messaging.Action.REMOVE_WALL, s);
 			fakeWalls.remove(s);
 		}
@@ -912,17 +918,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void fakeWall(MazeState s) {
-//			System.out.printf("fakeWall: %s \n", s.toString());
 			if (!HAS_PARTNER) {
-//				System.err.println("have no partner");
 				return;
 			}
 			if (fakeWalls.contains(s)) {
-//				System.err.println("is already fake wall");
 				return;
 			}
 			else if (originalMazeWorld.isWall(s.x(), s.y(), s.dir())) {
-//				System.err.println("is real wall");
 				return;
 			}
 			else {
