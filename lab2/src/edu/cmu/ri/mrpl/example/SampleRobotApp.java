@@ -713,7 +713,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		
 		// whether or not we can edit ours/partners maze
 		private boolean inCharge = !HAS_PARTNER || IS_FIRST_PARTNER;
-		private long inChargeSince = System.currentTimeMillis();
+		private long inChargeSince;
 		public static final long IN_CHARGE_DURATION = 1000;
 		public List<MazeState> fakeWalls = new LinkedList<MazeState>();
 
@@ -801,6 +801,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					e.printStackTrace();
 				}
 			}
+			inChargeSince = System.currentTimeMillis();
 
 			// stopping handled by START subtask method
 			// which transitions to END_TASK if there are no more golds
@@ -911,13 +912,17 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void fakeWall(MazeState s) {
+//			System.out.printf("fakeWall: %s \n", s.toString());
 			if (!HAS_PARTNER) {
+//				System.err.println("have no partner");
 				return;
 			}
 			if (fakeWalls.contains(s)) {
+//				System.err.println("is already fake wall");
 				return;
 			}
 			else if (originalMazeWorld.isWall(s.x(), s.y(), s.dir())) {
+//				System.err.println("is real wall");
 				return;
 			}
 			else {
