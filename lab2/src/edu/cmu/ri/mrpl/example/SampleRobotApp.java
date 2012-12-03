@@ -1,7 +1,6 @@
 /* XXX TODO
- * adjust path following to account for carpet
- * remove fake walls behind us as we travel along path
  * stopping/turning sloppiness when not toward gold
+ * prioritize golds
  * 
  * maybe replan on the fly
  */
@@ -1389,7 +1388,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				// assume partner is AWOL, go to single player mode
 				HAS_PARTNER = false;
 				inCharge = true;
-				speech.speak("partner awol");
+				speech.speak("partner a wall");
 			}
 		}
 		
