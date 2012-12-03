@@ -18,52 +18,56 @@ package edu.cmu.ri.mrpl.example;
  * for many years.
  */
 
-import java.io.*;
+import static edu.cmu.ri.mrpl.RobotModel.ROBOT_RADIUS;
+import static edu.cmu.ri.mrpl.maze.MazeLocalizer.*;
+import static java.lang.Math.*;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Container;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.awt.geom.Line2D;
+import java.awt.geom.Point2D;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.awt.*;
-import java.awt.event.*;
-import java.awt.geom.Line2D;
-import java.awt.geom.Point2D;
-import java.awt.image.BufferedImage;
 
-import javax.swing.*;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFileChooser;
+import javax.swing.JFormattedTextField;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.WindowConstants;
 
 import edu.cmu.ri.mrpl.*;
 import edu.cmu.ri.mrpl.CommClient.CommException;
-import edu.cmu.ri.mrpl.Robot;
 import edu.cmu.ri.mrpl.comm.Messaging;
-import edu.cmu.ri.mrpl.kinematics2D.Angle;
-import edu.cmu.ri.mrpl.kinematics2D.RealPoint2D;
-import edu.cmu.ri.mrpl.kinematics2D.RealPose2D;
-import edu.cmu.ri.mrpl.maze.MazeGraphics;
+import edu.cmu.ri.mrpl.kinematics2D.*;
+import edu.cmu.ri.mrpl.maze.*;
 import edu.cmu.ri.mrpl.maze.MazeGraphics.ContRobot;
-import edu.cmu.ri.mrpl.maze.MazeLocalizer;
-import static edu.cmu.ri.mrpl.maze.MazeLocalizer.*;
-import edu.cmu.ri.mrpl.maze.MazeRobot;
-import edu.cmu.ri.mrpl.maze.MazeSolver;
-import edu.cmu.ri.mrpl.maze.MazeState;
-import edu.cmu.ri.mrpl.maze.MazeWorld;
 import edu.cmu.ri.mrpl.maze.MazeWorld.Direction;
-import edu.cmu.ri.mrpl.usbCamera.PicCanvas;
-import edu.cmu.ri.mrpl.usbCamera.UsbCamera;
-import edu.cmu.ri.mrpl.util.AngleMath;
-import edu.cmu.ri.mrpl.util.Cooperation;
-import edu.cmu.ri.mrpl.util.GradientDescent;
-import edu.cmu.ri.mrpl.util.GradientDescent.WallPointFitter;
-import edu.cmu.ri.mrpl.util.Lookahead;
-import edu.cmu.ri.mrpl.util.MazeFileChooser;
-import edu.cmu.ri.mrpl.util.RingBuffer;
-import edu.cmu.ri.mrpl.util.GradientDescent.ErrorFunction;
-import static java.lang.Math.*;
-import static edu.cmu.ri.mrpl.RobotModel.*;
+import edu.cmu.ri.mrpl.usbCamera.*;
+import edu.cmu.ri.mrpl.util.*;
+import edu.cmu.ri.mrpl.util.GradientDescent.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
 
-	public static final boolean HAS_PARTNER = true;
+	private boolean HAS_PARTNER = false;
 	public static final boolean IS_FIRST_PARTNER = true;
 	
 	private Robot robot;
@@ -76,7 +80,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 	private JButton pauseButton;
 	private JButton waitButton;
-	private JButton turnToButton;
+	private JButton gooButton;
 	private JButton goToButton;
 	private JButton poseToButton;
 	private JFormattedTextField argumentField;
@@ -89,7 +93,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	private JButton quitButton;
 	private JButton executeButton;
 	private JButton loadMazeButton;
-	private JButton solveMazeButton;
+	private JButton michaelPhelpsButton;
 
 	private java.util.LinkedList<Task> upcomingTasks;
 
@@ -133,7 +137,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 		pauseButton = new JButton("Test camera");
 		waitButton = new JButton("Setup comms");
-		turnToButton = new JButton("GOOOOOO"); // was "Turn to angle!"
+		gooButton = new JButton("GOOOOOO"); // was "Turn to angle!"
 		goToButton = new JButton("Go to distance!");
 		poseToButton = new JButton("twitch..."); // was "Go to pose!"
 		argumentField = new JFormattedTextField(NumberFormat.getInstance());
@@ -152,21 +156,21 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		quitButton = new JButton(">> quit <<");
 		executeButton = new JButton("Execute File");
 		loadMazeButton = new JButton("Load Maze File");
-		solveMazeButton = new JButton("Michael Phelps");
+		michaelPhelpsButton = new JButton("Michael Phelps");
 
 		connectButton.addActionListener(this);
 		disconnectButton.addActionListener(this);
 
 		pauseButton.addActionListener(this);
 		waitButton.addActionListener(this);
-		turnToButton.addActionListener(this);
+		gooButton.addActionListener(this);
 		goToButton.addActionListener(this);
 		poseToButton.addActionListener(this);
 		stopButton.addActionListener(this);
 		quitButton.addActionListener(this);
 		executeButton.addActionListener(this);
 		loadMazeButton.addActionListener(this);
-		solveMazeButton.addActionListener(this);
+		michaelPhelpsButton.addActionListener(this);
 
 		Container main = getContentPane();
 		main.setLayout(new BoxLayout(main, BoxLayout.Y_AXIS));
@@ -197,7 +201,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		box = Box.createHorizontalBox();
 		main.add(box);
 		box.add(Box.createHorizontalStrut(30));
-		box.add(turnToButton);
+		box.add(gooButton);
 		box.add(Box.createHorizontalStrut(30));
 		box.add(goToButton);
 		box.add(Box.createHorizontalStrut(30));
@@ -216,7 +220,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 		box = Box.createHorizontalBox();
 		main.add(box);
-		box.add(solveMazeButton);
+		box.add(michaelPhelpsButton);
 		
 		main.add(Box.createVerticalStrut(30));
 
@@ -367,11 +371,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	public void actionPerformed(ActionEvent e) {
 		Object source = e.getSource();
 
-		double argument = Double.parseDouble(argumentField.getText());
-		double x = Double.parseDouble(xField.getText());
-		double y = Double.parseDouble(yField.getText());
-		double th = Double.parseDouble(thField.getText());
-
 		if (source==connectButton) {
 			connect();
 			waitButton.requestFocusInWindow();
@@ -390,7 +389,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		} else if ( source==waitButton ) {
 //			upcomingTasks.add(new WaitTask(this, argument));
 //			startUpcomingTasks();
-			solveMazeButton.requestFocusInWindow();
+			michaelPhelpsButton.requestFocusInWindow();
 			comm = new CommClient("128.237.236.81");
 			
 			//commclient test stuff
@@ -433,33 +432,11 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 			}
 			messaging = new Messaging(comm, myFriends[0]);
-		} else if ( source==turnToButton ) {
+		} else if ( source==gooButton ) {
 			//upcomingTasks.add(new TurnToTask(this, argument));
 			//startUpcomingTasks();
 			timeToGo = true;
-		} else if ( source==goToButton ) {
-			upcomingTasks.add(new GoToTask(this, argument));
-			startUpcomingTasks();
-		} else if (source == poseToButton) {
-			upcomingTasks.add(new PoseToTask(this, x, y, th));
-			startUpcomingTasks();
-		} else if ( source==executeButton ) {
-			addFileTasksToQueue();
-		} else if ( source==loadMazeButton ) {
-			JFileChooser chooser = new JFileChooser();
-			int returnVal = chooser.showOpenDialog(this);
-			if(returnVal == JFileChooser.APPROVE_OPTION) {
-				System.out.println("You chose to open this file: " +
-						chooser.getSelectedFile().getName());
-			}
-			try {
-				upcomingTasks.add(new DrawMazeTask(this, chooser.getSelectedFile().getPath()));
-			} catch (IOException e1) {
-				System.err.println("Couldn't read maze file");
-			}
-
-			startUpcomingTasks();
-		} else if ( source==solveMazeButton ) {
+		} else if ( source==michaelPhelpsButton ) {
 			JFileChooser chooser = new MazeFileChooser();
 			int returnVal = chooser.showOpenDialog(this);
 			if(returnVal == JFileChooser.APPROVE_OPTION) {
@@ -522,28 +499,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 
 				this.requestFocus();
-				turnToButton.requestFocusInWindow();
+				gooButton.requestFocusInWindow();
 			}
 		}
-	}
-
-	public void addFileTasksToQueue() {
-		JFileChooser chooser = new JFileChooser();
-		int returnVal = chooser.showOpenDialog(this);
-		if(returnVal == JFileChooser.APPROVE_OPTION) {
-			System.out.println("You chose to open this file: " +
-					chooser.getSelectedFile().getName());
-		}
-
-		CommandSequence commandSequence = new CommandSequence();
-
-		try {
-			commandSequence.readFile(chooser.getSelectedFile().getPath());
-		} catch (IOException e) {
-			System.err.println("Couldn't read file");
-		}
-
-		executeActionList(commandSequence);
 	}
 	
 	public synchronized boolean canStart(Task t) {
@@ -572,51 +530,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		});
 	}
 
-	public void executeActionList (ArrayList<Command> commands) {
-		for (Command cmd : commands) {
-			System.err.println(cmd.type);
-			switch (cmd.type) {
-			case PAUSE:
-				upcomingTasks.add(new PauseTask(this));
-				break;
-
-			case TURNTO:
-				upcomingTasks.add(new TurnToTask(this,
-						((Command.AngleArgument) cmd.argument).angle.angleValue()));
-				break;
-
-			case GOTO:
-				upcomingTasks.add(new GoToTask(this,
-						((Command.LengthArgument) cmd.argument).d));
-				break;
-
-			case WAIT:
-				upcomingTasks.add(new WaitTask(this,
-						((Command.LengthArgument) cmd.argument).d));
-				break;
-
-			case POSETO:
-				RealPose2D pose = ((Command.PoseArgument) cmd.argument).pose;
-				upcomingTasks.add(new PoseToTask(this,
-						pose.getX(),
-						pose.getY(),
-						pose.getTh()));
-				break;
-			case FOLLOWPATH:
-				Path path = ((Command.PathArgument) cmd.argument).path;
-				upcomingTasks.add(new FollowPathTask(this, path, 0.1));
-				break;
-
-			default:
-				System.err.println("unimplemented Command type: " + cmd.type);
-				new Speech().speak("unimplemented Command type: " + cmd.type);
-				break;
-			}
-		}
-
-		startUpcomingTasks();
-	}
-	
 	// here we implement the different robot controllers
 	// as Tasks
 	//
@@ -675,53 +588,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		public void mouseExited(MouseEvent arg0) {}
 		public void mousePressed(MouseEvent arg0) {}
 		public void mouseReleased(MouseEvent arg0) {}
-	}
-
-	class WaitTask extends Task {
-
-		Speech speech;
-		double duration;
-		private long startTime;
-
-		WaitTask(TaskController tc, double d) {
-			super(tc);
-			setDuration(d);
-		}
-
-		public void setDuration (double d) {
-			duration = d;
-		}
-
-		public void taskRun() {
-			speech = new Speech();
-			speech.speak("Waiting " + AngleMath.roundTo2(duration) + " seconds");
-			startTime = System.currentTimeMillis();
-			double elapsed = elapsedTime();
-
-			while(!shouldStop() && elapsed < duration) {
-				elapsed = elapsedTime();
-				if (elapsed >= duration) {
-					break;
-				}
-				try {
-					//remainingField.setValue(duration - elapsed);
-
-					Thread.sleep(5);
-				} catch(InterruptedException iex) {
-					System.err.println("wait sleep interrupted");
-				}
-			}
-			// final update
-			remainingField.setText(duration - elapsed + "");
-		}
-
-		private double elapsedTime() {
-			return (System.currentTimeMillis() - startTime) / 1000.0;
-		}
-
-		public String toString() {
-			return "wait task: " + duration;
-		}
 	}
 
 	class TurnToTask extends Task {
@@ -803,83 +669,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 	}
 
-	class GoToTask extends Task {
-
-		double desiredDistance;
-		RealPose2D robotStartedHere;
-		Controller controller;
-		Perceptor perceptor;
-		Speech speech;
-
-		GoToTask(TaskController tc, double d) {
-			super(tc);
-			setDesiredDistance(d);
-		}
-
-		public void setDesiredDistance (double d) {
-			controller = new Controller(robot);
-			perceptor = new Perceptor(robot);
-			desiredDistance = d;
-		}
-
-		// setDesiredDistance should be called before calling this method
-		public void taskRun() {
-			speech = new Speech();
-			robot.updateState();
-			final double Kp = 1.5;
-			final double Kd = 15;
-			double u = 0;
-			robotStartedHere = perceptor.getWorldPose();
-			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-			RealPose2D lastPoseRelStart = curPoseRelStart;
-			double curTime = System.nanoTime();
-			double lastTime = curTime;
-			final Point2D destPointRelStart = new Point2D.Double(desiredDistance, 0);
-			double distanceErr = destPointRelStart.getX() - curPoseRelStart.getX();
-
-			final double DISTANCE_TOLERANCE = 0.005;
-			final double SPEED_TOLERANCE = 0.01;
-
-			while(!shouldStop() &&
-					(abs(distanceErr) > DISTANCE_TOLERANCE
-							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
-			{
-				robot.updateState();
-				lastPoseRelStart = curPoseRelStart;
-				lastTime = curTime;
-				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-				curTime = System.currentTimeMillis();
-				distanceErr = destPointRelStart.getX() - curPoseRelStart.getX();
-
-				double distanceTraveled = curPoseRelStart.getX() - lastPoseRelStart.getX();
-				boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
-
-				double pterm = Kp*distanceErr;
-				double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
-				if (progressMade) {
-					dterm *= -1;
-				}
-				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
-				u = pterm + dterm;
-				double speed = u;
-				controller.setVel(speed, speed);
-
-				try {
-					Thread.sleep(5);
-				} catch(InterruptedException iex) {
-					System.err.println("go-to sleep interrupted");
-				}
-			}
-
-			speech.speak("error " + AngleMath.roundTo2(distanceErr*1000) + " millimeters");
-			controller.stop();
-		}
-
-		public String toString() {
-			return "go-to task: " + desiredDistance;
-		}
-	}
-
 	private static double calculateArcLength (Point2D dest, double radius) {
 		double x = dest.getX();
 		double y = dest.getY();
@@ -914,653 +703,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		return new double[]{radius, arcLength};
 	}
 
-	class PoseToTask extends Task {
-		RealPose2D destPoseRelStart;
-		Controller controller;
-		Perceptor perceptor;
-		Speech speech;
-		TaskController tc;
-
-		PoseToTask(TaskController tc, double x, double y, double th) {
-			super(tc);
-			this.tc = tc;
-			setDesiredPose(x,y,th);
-		}
-
-		public void setDesiredPose (double x, double y, double th) {
-			controller = new Controller(robot);
-			perceptor = new Perceptor(robot);
-			destPoseRelStart = new RealPose2D(x,y,th);
-		}
-
-		// setDesiredPose should be called before calling this method
-		public void taskRun() {
-			speech = new Speech();
-			robot.updateState();
-
-			final double Kp = 2;
-			//final double Kd = 10;
-
-			RealPose2D robotStartedHere = perceptor.getWorldPose();
-			RealPose2D curPoseRelStart = new RealPose2D();
-			//RealPose2D lastPoseRelStart;
-			//double curTime = System.nanoTime();
-			//double lastTime;
-
-			// calculate arc info
-			double[] arcInfo = calculateArc(destPoseRelStart.getPosition());
-			double radius = arcInfo[0];
-			double distanceErr = arcInfo[1];
-			System.err.printf("arc: radius=%.2f, distanceErr=%.2f\n", radius, distanceErr);
-
-			do {
-				// update everything
-				//	lastPoseRelStart = curPoseRelStart;
-				//lastTime = curTime;
-				robot.updateState();
-				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-				//				curTime = System.currentTimeMillis();
-
-				// figure out how far we've been
-				//RealPose2D curPoseRelLast = RealPose2D.multiply(
-				//		lastPoseRelStart.inverse(), curPoseRelStart);
-				//double distanceTraveled = calculateArcLength(curPoseRelLast.getPosition(), radius);
-
-				// compute whether progress has been made
-				RealPose2D destPoseRelCur = RealPose2D.multiply(
-						curPoseRelStart.inverse(), destPoseRelStart);
-				distanceErr = calculateArcLength(destPoseRelCur.getPosition(), radius);
-				//boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
-
-				// calculate dterm
-				/*
-				double dterm = Kd*(abs(distanceTraveled))/(curTime-lastTime);
-				if (progressMade) {
-					dterm *= -1;
-				}
-				 */
-
-				// set wheel speeds
-				double pterm = Kp*distanceErr;
-				double speed = pterm;// + dterm;
-				controller.setCurvVel(1.0/radius, speed);
-
-				try {
-					Thread.sleep(5);
-				} catch(InterruptedException iex) {
-					System.err.println("go-to sleep interrupted");
-				}
-			} while(!shouldStop() &&
-					(abs(distanceErr) > DISTANCE_TOLERANCE
-							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE));
-
-			System.out.println("Current x = "+curPoseRelStart.getX());
-			System.out.println("Current y = "+curPoseRelStart.getY());
-			System.out.println("FINISHED X/Y. STARTING THETA");
-
-			speech.speak("remaining error " + AngleMath.roundTo2(distanceErr*1000)
-					+ " millimeters");
-
-			upcomingTasks.add(0, new TurnToTask(tc, Angle.normalize(
-					destPoseRelStart.getTh() + robotStartedHere.getTh() - robot.getHeading())));
-			controller.stop();
-		}
-
-		public String toString() {
-			return "pose-to task: " + destPoseRelStart;
-		}
-	}
-
-	class FollowPathTask extends Task {
-		ArrayList<RealPose2D> desiredPath;
-		java.util.List<Line2D> pathSegments;
-		double maxDeviation;
-		RealPose2D robotStartedHere;
-		Controller controller;
-		Perceptor perceptor;
-		Speech speech;
-
-		private final double LOOKAHEAD_DISTANCE = MazeLocalizer.WALL_METERS;
-
-		//private TaskController tc;
-
-		FollowPathTask(TaskController tc, ArrayList<RealPose2D> poses, double maxDeviation) {
-			super(tc);
-			//this.tc = tc;
-			setDesiredPath(poses, maxDeviation);
-		}
-
-		public void setDesiredPath (ArrayList<RealPose2D> poses, double maxDeviation) {
-			controller = new Controller(robot);
-			perceptor = new Perceptor(robot);
-			desiredPath = new ArrayList<RealPose2D>(poses);
-			this.maxDeviation = maxDeviation;
-
-			// construct list of line segments
-			pathSegments = Lookahead.posesToPath(poses);
-			System.err.println(desiredPath.size() + " PATH SEGMENTS");
-		}
-
-		// setDesiredPath should be called before calling this method
-		public void taskRun() {
-			robot.updateState();
-			speech = new Speech();
-			double Kp = 2;
-			//double Kd = 10;
-			//double u = 0;
-
-			robotStartedHere = perceptor.getWorldPose();
-			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-			RealPoint2D tmp = new RealPoint2D();
-			Lookahead.findLookaheadPoint(pathSegments, curPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
-			Point2D destPointRelCur = robotStartedHere.inverseTransform(tmp, null);
-
-			double[] arcInfo = calculateArc(destPointRelCur);
-			double distanceErr = arcInfo[1];
-
-			while(!shouldStop() &&
-					(abs(distanceErr) > DISTANCE_TOLERANCE
-							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
-			{
-				robot.updateState();
-				curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-
-				// remove the old lookahead point
-				if (robot instanceof SimRobot) {
-					((SimRobot) robot).deleteObstacle(tmp.getX(), tmp.getY());
-				}
-
-				// recalculate destination (code copied from before loop)
-				Lookahead.findLookaheadPoint(pathSegments, curPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
-				destPointRelCur = curPoseRelStart.inverseTransform(tmp, null);
-
-				// draw the lookahead point
-				if (robot instanceof SimRobot) {
-					if (tmp.distance(perceptor.getWorldPose().getPosition()) > .25) {
-						((SimRobot) robot).addObstacle(tmp.getX(), tmp.getY(), 0.01);
-					}
-				}
-
-				arcInfo = calculateArc(destPointRelCur);
-				controller.setCurvVel(1.0/arcInfo[0], Kp*arcInfo[1]);
-
-				try {
-					Thread.sleep(5);
-				} catch(InterruptedException iex) {
-					System.err.println("go-to sleep interrupted");
-				}
-			}
-			System.out.println("Current x = "+curPoseRelStart.getX());
-			System.out.println("Current y = "+curPoseRelStart.getY());
-
-			// figure out what to do at the end of the path (turnto, etc)
-			/* copied code from TurnToTask.
-			// Check whether the "rapid transition" rule is broken here.
-			System.out.println("FINISHED X/Y. STARTING THETA");
-			Kp = .4;
-			Kd = 95;
-			u = 0;
-			robot.updateState();
-			double curAngle = Angle.normalize(robot.getHeading());
-			double lastAngle = curAngle;
-			curTime = System.nanoTime();
-			lastTime = curTime;
-			curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-			double desiredAngle = Angle.normalize(desiredPose.getTh() - curPoseRelStart.getTh());
-			double destAngle = Angle.normalize(curAngle + desiredAngle);
-			//System.out.println("destAngle: " + destAngle);
-			double angleErr = Angle.normalize(destAngle - curAngle);
-
-			final double ANGLE_TOLERANCE = 0.01;
-			SPEED_TOLERANCE = 0.01;
-
-			while(!shouldStop() &&
-					(abs(angleErr) > ANGLE_TOLERANCE
-							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
-			{
-				//System.out.println("angleErr = " + angleErr);
-				robot.updateState();
-				lastAngle = curAngle;
-				lastTime = curTime;
-				curAngle = Angle.normalize(robot.getHeading());
-				//curTime = System.nanoTime();
-				curTime = System.currentTimeMillis();
-				angleErr = Angle.normalize(destAngle - curAngle);
-
-				double angleTraveled = Angle.normalize(curAngle - lastAngle);
-				boolean progressMade = signum(angleTraveled) == signum(angleErr);
-
-				double pterm = Kp*abs(angleErr);
-				double dterm = Kd*(abs(angleTraveled))/(curTime-lastTime);
-				if (progressMade) {
-					dterm *= -1;
-				}
-				//System.err.println("pterm = " + pterm + "\ndterm = " + dterm + "\n");
-				u = pterm + dterm;
-				double direction = signum(angleErr);
-				//System.err.println(angleErr + " off, speed = " + u*direction);
-				double speed = direction*u;
-				controller.setVel(-speed, speed);
-
-				try {
-					Thread.sleep(5);
-				} catch(InterruptedException iex) {
-					System.err.println("pose-to (turn) sleep interrupted");
-				}
-			}
-
-
-			speech.speak("remaining error " + AngleMath.roundTo2(distanceErr*1000)
-					+ " millimeters");
-			//*/
-			controller.stop();
-		}
-
-		public String toString() {
-			return "follow-path task: " + desiredPath;
-		}
-	}
-
-	class DrawMazeTask extends Task {
-
-		Perceptor perceptor;
-		MazeLocalizer correctedLocalizer;
-		MazeLocalizer rawLocalizer;
-		MazeWorld mazeWorld;
-		MazeGraphics mazeGraphics;
-		MazeRobot mazeRobot;
-		JFrame wrapper;
-		
-		private static final boolean USE_SONARS = true;
-
-		DrawMazeTask(TaskController tc, String fileName) throws IOException {
-			super(tc);
-			mazeWorld = new MazeWorld(fileName);
-			mazeGraphics = new MazeGraphics(mazeWorld);
-			
-			// construct corrected localizer
-			correctedLocalizer = new MazeLocalizer(mazeWorld, false);
-			// save init
-			MazeState init = mazeWorld.getInits().iterator().next();
-			
-			if (!USE_SONARS) {
-				mazeWorld.removeAllInits();
-				mazeWorld.addInit(new MazeState(0, 0, MazeWorld.Direction.East));
-			}
-			
-			// construct uncorrected localizer
-			rawLocalizer = new MazeLocalizer(mazeWorld, true);
-		
-			if (!USE_SONARS) {
-				// replace original init
-				mazeWorld.removeAllInits();
-				mazeWorld.addInit(init);
-			}
-			
-			if (USE_SONARS) {
-				robot.turnSonarsOn();
-			}
-			
-			perceptor = new Perceptor(robot);
-			perceptor.setCorrectedPose(MazeLocalizer.mazeStateToWorldPose(init));
-			wrapper = new JFrame();
-			wrapper.add(mazeGraphics);
-			wrapper.setSize(400, 400);
-			wrapper.setVisible(true);
-		}
-
-		public void taskRun() {
-			RingBuffer<Point2D> pointsBuffer;
-			RealPoint2D[] sonarPointsBuffer;
-			double[] directSonarReadings;
-			
-			if (USE_SONARS) {
-				pointsBuffer = new RingBuffer<Point2D>(400);
-				sonarPointsBuffer = null;
-				directSonarReadings = new double[16];
-			}
-			
-			java.util.List<ContRobot> list = Collections.synchronizedList(new ArrayList<ContRobot>()); 
-			RealPose2D correctedPosition = correctedLocalizer.fromInitToCell(perceptor.getCorrectedPose());
-			RealPose2D rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
-			list.add(new ContRobot(rawPosition, Color.RED));
-			list.add(new ContRobot(correctedPosition, Color.GREEN));
-			
-			mazeGraphics.setContRobots(list);
-			
-			RealPose2D curPose = perceptor.getCorrectedPose();
-			RealPose2D lastPollPosition = perceptor.getCorrectedPose();
-			RealPose2D lastGradientPosition = perceptor.getCorrectedPose();
-			double pollInterval = 0.01; // meters between polling the sonars
-			double gradientInterval = 0.25; // meters between running gradient descent on points
-						
-			while(!shouldStop()) {
-				robot.updateState();
-				
-				curPose = perceptor.getCorrectedPose();
-					
-				if (USE_SONARS && curPose.getPosition().distance(lastPollPosition.getPosition())  > pollInterval) {
-					lastPollPosition = curPose;
-					
-					robot.getSonars(directSonarReadings);
-					sonarPointsBuffer = perceptor.getSonarObstacles();
-					for (int i=0; i<sonarPointsBuffer.length; i++) {
-						// only use the sonar readings that are within a certain distance
-						if (directSonarReadings[i] < 2.0 ) {
-							pointsBuffer.add(correctedLocalizer.transformInitToWorld(perceptor.getCorrectedPose().transform(sonarPointsBuffer[i], null)));
-						}
-					}
-				}
-				
-				// Every interval (.25 meters) do this
-				// Run gradient descent and correct the position of the robot in the maze based on the sonars and the walls
-				if (USE_SONARS && curPose.getPosition().distance(lastGradientPosition.getPosition()) > gradientInterval) {
-					
-					ErrorFunction fitter = new WallPointFitter(pointsBuffer, curPose);
-					double[] coords = new double[]{curPose.getX(), curPose.getY(), curPose.getTh()};
-					GradientDescent.descend(fitter, coords);
-					
-					curPose.setPose(coords[0], coords[1], coords[2]);
-					lastGradientPosition = curPose;
-					lastPollPosition = curPose;
-					
-					perceptor.setCorrectedPose(curPose);
-					
-					// Clear the points buffer
-					pointsBuffer.clear();
-				}
-				
-				correctedPosition = correctedLocalizer.fromInitToCell(perceptor.getCorrectedPose());
-				rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
-				
-				synchronized(list) {
-					list.get(0).pose.setPose(rawPosition.getX(), rawPosition.getY(), rawPosition.getTh()*PI/2);
-					list.get(1).pose.setPose(correctedPosition.getX(), correctedPosition.getY(), correctedPosition.getTh()*PI/2);
-				}
-				
-				remainingField.setText(String.format("(%.2f, %.2f, %.2f)",
-						correctedPosition.getX(), correctedPosition.getY(), (correctedPosition.getTh()+4)%4));
-				mazeGraphics.setContRobots(list);
-				mazeGraphics.repaint();
-				
-				try {
-					Thread.sleep(50);
-				} catch(InterruptedException iex) {
-					System.err.println("draw maze interrupted");
-				}
-			}
-
-			remainingField.setText("");
-			if (USE_SONARS) {
-				robot.turnSonarsOff();
-			}
-		}
-
-		public String toString() {
-			return "draw maze task";
-		}
-	}
-	
-	class SolveMazeTask extends Task {
-		// Globals from followpath
-		ArrayList<RealPose2D> desiredPath;
-		java.util.List<Line2D> pathSegments;
-		double maxDeviation;
-		RealPose2D robotStartedHere;
-		Controller controller;
-		Speech speech;
-
-		// globals from mazedrawer
-		Perceptor perceptor;
-		MazeLocalizer correctedLocalizer;
-		MazeLocalizer rawLocalizer;
-		MazeWorld mazeWorld;
-		MazeGraphics mazeGraphics;
-		MazeRobot mazeRobot;
-		JFrame wrapper;
-		
-		private final double LOOKAHEAD_DISTANCE = 0.6;
-
-		private static final boolean USE_SONARS = true;
-		
-		private TaskController tc;
-
-		SolveMazeTask(TaskController tc, double maxDeviation, String mazeFileName) {
-			super(tc);
-			this.tc = tc;
-			
-			try {
-				mazeWorld = new MazeWorld(mazeFileName);
-			} catch (IOException e) {
-				System.err.println("Couldn't read maze file!");
-			}
-			mazeGraphics = new MazeGraphics(mazeWorld);
-			
-			java.util.List<RealPose2D> poses;
-			// findPath no longer supports finding generic "goals"
-			List<MazeState> states = new MazeSolver(mazeWorld).findPath(true);
-			poses = MazeLocalizer.statesToPoses(states);
-			setDesiredPath(poses, maxDeviation);
-			
-			// construct corrected localizer
-			correctedLocalizer = new MazeLocalizer(mazeWorld, false);
-			// save init
-			MazeState init = mazeWorld.getInits().iterator().next();
-			
-			if (!USE_SONARS) {
-				mazeWorld.removeAllInits();
-				mazeWorld.addInit(new MazeState(0, 0, MazeWorld.Direction.East));
-			}
-			
-			// construct uncorrected localizer
-			rawLocalizer = new MazeLocalizer(mazeWorld, true);
-		
-			if (!USE_SONARS) {
-				// replace original init
-				mazeWorld.removeAllInits();
-				mazeWorld.addInit(init);
-			}
-			
-			if (USE_SONARS) {
-				robot.turnSonarsOn();
-			}
-			
-			perceptor = new Perceptor(robot);
-			perceptor.setCorrectedPose(MazeLocalizer.mazeStateToWorldPose(init));
-			wrapper = new JFrame();
-			wrapper.add(mazeGraphics);
-			wrapper.setSize(400, 400);
-			wrapper.setVisible(true);
-		}
-		
-		public void setDesiredPath (List<RealPose2D> poses, double maxDeviation) {
-			controller = new Controller(robot);
-			perceptor = new Perceptor(robot);
-			desiredPath = new ArrayList<RealPose2D>(poses);
-			this.maxDeviation = maxDeviation;
-
-			// construct list of line segments
-			pathSegments = Lookahead.posesToPath(poses);
-			System.err.println(desiredPath.size() + " PATH SEGMENTS");
-		}
-
-		public void taskRun() {
-			RingBuffer<Point2D> pointsBuffer;
-			RealPoint2D[] sonarPointsBuffer;
-			double[] directSonarReadings;
-			
-			robot.updateState();
-			speech = new Speech();
-			double Kp = 2;
-			//double Kd = 10;
-			//double u = 0;
-
-			robotStartedHere = perceptor.getWorldPose();
-//			RealPose2D curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-//			RealPoint2D tmp = new RealPoint2D();
-//			Lookahead.findLookaheadPoint(pathSegments, curPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
-//			Point2D destPointRelCur = robotStartedHere.inverseTransform(tmp, null);
-
-//			double[] arcInfo = calculateArc(destPointRelCur);
-//			double distanceErr = arcInfo[1];
-			
-			if (USE_SONARS) {
-				pointsBuffer = new RingBuffer<Point2D>(400);
-				sonarPointsBuffer = null;
-				directSonarReadings = new double[16];
-			}
-			
-			java.util.List<ContRobot> list = Collections.synchronizedList(new ArrayList<ContRobot>()); 
-			RealPose2D correctedPosition = correctedLocalizer.fromInitToCell(perceptor.getCorrectedPose());
-			RealPose2D rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
-			list.add(new ContRobot(rawPosition, Color.RED));
-			list.add(new ContRobot(correctedPosition, Color.GREEN));
-			
-			mazeGraphics.setContRobots(list);
-			
-			RealPose2D curPose = perceptor.getCorrectedPose();
-			
-			// Look at my comment below using this same garbage...
-			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
-			
-			RealPose2D lastPollPosition = perceptor.getCorrectedPose();
-			RealPose2D lastGradientPosition = perceptor.getCorrectedPose();
-			
-			RealPoint2D tmp = new RealPoint2D();
-			int segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
-			Point2D destPointRelCur = robotStartedHere.inverseTransform(tmp, null);
-			
-			double pollInterval = 0.01; // meters between polling the sonars
-			double gradientInterval = .1; // meters between running gradient descent on points
-						
-			double[] arcInfo = calculateArc(destPointRelCur);
-			double distanceErr = arcInfo[1];
-			
-			while(!shouldStop() &&
-					(abs(distanceErr) > DISTANCE_TOLERANCE
-							|| abs(robot.getVelLeft()) > SPEED_TOLERANCE))
-			{
-				robot.updateState();
-				curPose = perceptor.getCorrectedPose();
-					
-				if (USE_SONARS && curPose.getPosition().distance(lastPollPosition.getPosition())  > pollInterval) {
-					lastPollPosition = curPose;
-					
-					robot.getSonars(directSonarReadings);
-					sonarPointsBuffer = perceptor.getSonarObstacles();
-					for (int i=0; i<sonarPointsBuffer.length; i++) {
-						// only use the sonar readings that are within a certain distance
-						if (directSonarReadings[i] < 2.0 ) {
-							pointsBuffer.add(correctedLocalizer.transformInitToWorld(perceptor.getCorrectedPose().transform(sonarPointsBuffer[i], null)));
-						}
-					}
-				}
-				
-				// Every interval (.25 meters) do this
-				// Run gradient descent and correct the position of the robot in the maze based on the sonars and the walls
-				if (USE_SONARS && curPose.getPosition().distance(lastGradientPosition.getPosition()) > gradientInterval) {
-					
-					ErrorFunction fitter = new WallPointFitter(pointsBuffer, curPose);
-					double[] coords = new double[]{curPose.getX(), curPose.getY(), curPose.getTh()};
-					GradientDescent.descend(fitter, coords);
-					
-					curPose.setPose(coords[0], coords[1], coords[2]);
-					lastGradientPosition = curPose;
-					lastPollPosition = curPose;
-					
-					/*
-					RealPose2D uncorrected = perceptor.getCorrectedPose();
-					RealPose2D diffPose = RealPose2D.multiply(uncorrected.inverse(), curPose);
-					final double CORRECTION_FACTOR = 0.5;
-					diffPose.setPose(CORRECTION_FACTOR*diffPose.getX(), CORRECTION_FACTOR*diffPose.getY(), CORRECTION_FACTOR*diffPose.getTh());
-					RealPose2D partiallyCorrected = new RealPose2D(
-							uncorrected.getX() + diffPose.getX(),
-							uncorrected.getY() + diffPose.getY(),
-							uncorrected.getTh() + diffPose.getTh()
-					);
-					/*/
-					// toggle comments to not do smoothing
-					RealPose2D partiallyCorrected = curPose;
-					//*/
-					
-					perceptor.setCorrectedPose(partiallyCorrected);
-					
-					// Clear the points buffer
-					pointsBuffer.clear();
-				}
-				
-				correctedPosition = correctedLocalizer.fromInitToCell(perceptor.getCorrectedPose());
-				rawPosition = rawLocalizer.fromInitToCell(perceptor.getWorldPose());
-				
-				synchronized(list) {
-					list.get(0).pose.setPose(rawPosition.getX(), rawPosition.getY(), rawPosition.getTh()*PI/2);
-					list.get(1).pose.setPose(correctedPosition.getX(), correctedPosition.getY(), correctedPosition.getTh()*PI/2);
-				}
-				
-				remainingField.setText(String.format("(%.2f, %.2f, %.2f)",
-						correctedPosition.getX(), correctedPosition.getY(), (correctedPosition.getTh()+4)%4));
-				mazeGraphics.setContRobots(list);
-				mazeGraphics.repaint();
-				
-				// remove the old lookahead point
-				if (robot instanceof SimRobot) {
-					((SimRobot) robot).deleteObstacle(tmp.getX(), tmp.getY());
-				}
-				
-				// Make this right...so essentially what I'm doing here is subtracting half of the width of a cell from the X and Y of this correctedPose because
-				// it should have been at 0,0 when it was saying .3683, .3683
-				// It's late and I can't wrap my brain around the needed transform so I just did this and it seems to work except the robot has become "sloppy" now
-				// instead of the nice smooth runs we had in Lab 4
-				correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
-
-				segment = Lookahead.findLookaheadPoint(pathSegments, correctedPoseRelStart.getPosition(), LOOKAHEAD_DISTANCE, tmp);
-				destPointRelCur = correctedPoseRelStart.inverseTransform(tmp, null);
-
-				// draw the lookahead point
-				if (robot instanceof SimRobot) {
-					if (tmp.distance(perceptor.getWorldPose().getPosition()) > .25) {
-						((SimRobot) robot).addObstacle(tmp.getX(), tmp.getY(), 0.01);
-					}
-				}
-				
-				arcInfo = calculateArc(destPointRelCur);
-				// end of path
-				if (segment == pathSegments.size() - 1
-						&& destPointRelCur.distance(new Point2D.Double()) < 0.3) {
-					controller.setVel(0, 0);
-					if (perceptor.getSpeed() == 0) {
-						double targetTheta = desiredPath.get(desiredPath.size() - 1).getTh();
-						double curTheta = correctedPoseRelStart.getTh();
-						double dTheta = Angle.normalize(targetTheta - curTheta);
-						System.out.println(targetTheta);
-						System.out.println(curTheta);
-						System.out.println(dTheta);
-						upcomingTasks.add(0, new TurnToTask(tc, dTheta));
-						break;
-					}
-				}
-				else {
-					controller.setCurvVel(1.0/arcInfo[0], Kp*arcInfo[1]);
-				}
-				
-				try {
-					Thread.sleep(50);
-				} catch(InterruptedException iex) {
-					System.err.println("draw maze interrupted");
-				}
-			}
-
-			remainingField.setText("");
-			if (USE_SONARS) {
-				robot.turnSonarsOff();
-			}
-		}
-
-		public String toString() {
-			return "draw maze task";
-		}
-	}
-
 	enum Subtask {
 		START,
 		FOLLOWPATH_GOLD_CELL,
@@ -1573,7 +715,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	
 	// named so because it gets all the golds
 	class MichaelPhelpsTask extends Task {
-		private RealPose2D robotStartedHere;
+//		private RealPose2D robotStartedHere;
 		private Controller controller;
 		private Speech speech;
 		private UsbCamera cam;
@@ -1623,9 +765,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		
 		// GOTO stuff
 		private double xOffset;
-		private RealPose2D curPoseRelStart;
-		private RealPose2D lastPoseRelStart;
-		private Point2D destPointRelStart;
+//		private RealPose2D curPoseRelStart;
+//		private RealPose2D lastPoseRelStart;
 		private Point2D startPoint;
 		static final double IDEAL_GOLD_OFFSET = CELL_RADIUS - 1.4*ROBOT_RADIUS;
 		static final double MAGNET_DISTANCE = 0.5 * ROBOT_RADIUS;
@@ -1641,12 +782,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private RingBuffer<Point2D> pointsBuffer;
 		
 		// whether or not we can edit ours/partners maze
-		private boolean inCharge = IS_FIRST_PARTNER;
+		private boolean inCharge = !HAS_PARTNER || IS_FIRST_PARTNER;
 		private long inChargeSince = System.currentTimeMillis();
 		public static final long IN_CHARGE_DURATION = 1000;
-		// TODO get this working if it could be a problem
-		private boolean partnerAwol = false;
-		public static final long PARTNER_AWOL_TIMEOUT = 5*IN_CHARGE_DURATION;
 		public List<MazeState> fakeWalls = new LinkedList<MazeState>();
 
 		public MichaelPhelpsTask(TaskController tc, double maxDeviation, String mazeFileName) {
@@ -1694,7 +832,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			robot.turnSonarsOn();		
 			robot.updateState();
 
-			robotStartedHere = perceptor.getWorldPose();
+//			robotStartedHere = perceptor.getWorldPose();
 			
 			// set up continuous robots on graphical maze
 			java.util.List<ContRobot> contBotList = Collections.synchronizedList(new ArrayList<ContRobot>()); 
@@ -1743,7 +881,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				
 				tryPollSonars();
 				tryDescendPose();		
-				trySendTakeCharge();
+				transferCharge();
 				updateGraphics(contBotList);
 				
 				// end the task if requested
@@ -1894,10 +1032,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		
 		private void start() {
 			if (mazeWorld.getFreeGolds().isEmpty()) {
-				// XXX might not work
-				//transitionTo(Subtask.END_TASK);
-				// in order to get the partner to END_TASK
-				//messaging.sendAction(Messaging.Action.GO, null);
 				if (HAS_PARTNER) {
 					messaging.sendAction(Messaging.Action.TAKE_CHARGE, null);
 				}
@@ -1959,32 +1093,33 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		
 		private void setupGotoHelper (double xOffset) {
 			this.xOffset = xOffset;
-			// XXX janky
 			startPoint = curPose.getPosition();
 			System.out.println("setupGotoHelper: xOffset = " + xOffset);
-			robotStartedHere = curPose;
-			curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-			lastPoseRelStart = curPoseRelStart;
+//			robotStartedHere = curPose;
+//			curPoseRelStart = perceptor.getRelPose(robotStartedHere);
+//			lastPoseRelStart = curPoseRelStart;
 			
 			double curTime = System.nanoTime();
 			lastTime = curTime;
-			destPointRelStart = new Point2D.Double(xOffset, 0);
 		}
 		
 		private void goTo() {
+			/*
 			final double Kp = 1.5;
 			final double Kd = 15;
-//			lastPoseRelStart = curPoseRelStart;
-//			lastTime = curTime;
-//			curPoseRelStart = perceptor.getRelPose(robotStartedHere);
-//			curTime = System.currentTimeMillis();
-//			double distanceErr = destPointRelStart.getX() - curPoseRelStart.getX();
-			double distanceErr = xOffset - signum(xOffset) * curPose.getPosition().distance(startPoint);
+			lastPoseRelStart = curPoseRelStart;
+			lastTime = curTime;
+			curPoseRelStart = perceptor.getRelPose(robotStartedHere);
+			curTime = System.currentTimeMillis();
+			double distanceErr = destPointRelStart.getX() - curPoseRelStart.getX();
 			
 			final double DISTANCE_TOLERANCE = 0.01;
 			final double SPEED_TOLERANCE = 0.01;
 			
 			double distanceTraveled = curPoseRelStart.getX() - lastPoseRelStart.getX();
+			*/
+			
+			double distanceErr = xOffset - signum(xOffset) * curPose.getPosition().distance(startPoint);
 
 			// transition to next state
 			if (signum(distanceErr) != signum(xOffset)) {
@@ -2008,7 +1143,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				return;
 			}
 			
-			// XXX don't do fancy shit
+			// don't do fancy shit
 			/*
 			boolean progressMade = signum(distanceTraveled) == signum(distanceErr);
 
@@ -2084,7 +1219,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 							}
 							//*/
 							
-							// TODO change index to change technique
+							// change index to change technique
 							double chosenOffset;
 							if (retryGoto) {
 								chosenOffset = -xOffset;
@@ -2272,10 +1407,22 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 		}
 		
-		private void trySendTakeCharge() {
-			if (HAS_PARTNER && inCharge && System.currentTimeMillis() - IN_CHARGE_DURATION > inChargeSince) {
-				messaging.sendAction(Messaging.Action.TAKE_CHARGE, null);
-				inCharge = false;
+		private void transferCharge() {
+			if (!HAS_PARTNER) {
+				return;
+			}
+			
+			double time = System.currentTimeMillis();
+			if (inCharge) {
+				// transfer control if our time is up
+				if (time - IN_CHARGE_DURATION > inChargeSince) {
+					messaging.sendAction(Messaging.Action.TAKE_CHARGE, null);
+					inCharge = false;
+				}
+			} else if (time - 5*IN_CHARGE_DURATION > inChargeSince) {
+				// assume partner is AWOL, go to single player mode
+				HAS_PARTNER = false;
+				inCharge = true;
 			}
 		}
 		
@@ -2310,7 +1457,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		int blue = pixel[UsbCamera.BLUE];
 		int green = pixel[UsbCamera.GREEN];
 		
-		int margin = 5;
+//		int margin = 5;
 		
 		//return (blue - margin > red) && (blue - margin > green);
 		return (blue + green/2 > 2*red);
