@@ -64,7 +64,7 @@ import edu.cmu.ri.mrpl.util.GradientDescent.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
 
-	private boolean HAS_PARTNER = false;
+	private boolean HAS_PARTNER = true;
 	public static final boolean IS_FIRST_PARTNER = true;
 	
 	private Robot robot;
@@ -1380,6 +1380,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				// assume partner is AWOL, go to single player mode
 				HAS_PARTNER = false;
 				inCharge = true;
+				speech.speak("partner awol");
 			}
 		}
 		
