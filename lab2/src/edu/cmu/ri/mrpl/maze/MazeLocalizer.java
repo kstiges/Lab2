@@ -59,6 +59,9 @@ public class MazeLocalizer {
 		int x = (int) round(cellPose.getX());
 		int y = (int) round(cellPose.getY());
 		int dirIndex = (int) round(cellPose.getTh());
+		if (dirIndex < 0) {
+			dirIndex += 4;
+		}
 		Direction dir = Direction.values()[dirIndex];
 		return new MazeState(x, y, dir);
 	}
