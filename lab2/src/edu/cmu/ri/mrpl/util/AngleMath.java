@@ -14,7 +14,7 @@ public class AngleMath {
 		while (i > -1) {
 			switch (commands.charAt(i)) {
 			case 'G':
-				i = -1;
+				i = -2;
 				break;
 			case 'L':
 				theta += PI/2;

@@ -395,6 +395,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					//java.util.List<RealPose2D> poses = MazeLocalizer.statesToPoses(states);
 					
 					double theta = AngleMath.calculateTurnAngle(commands);
+					System.out.println(theta);
 					upcomingTasks.add(new TurnToTask(this, Angle.normalize(theta)));
 					
 					// follow the path
