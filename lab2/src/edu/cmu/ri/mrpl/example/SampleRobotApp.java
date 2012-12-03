@@ -1,9 +1,9 @@
 /* XXX TODO
- * remove fake walls behind us as we travel along path
- * maybe replan on the fly
- * stopping/turning sloppiness when not toward gold
- * turn to gold check should turn towards the next drop (but don't reserve/remove it)
  * adjust path following to account for carpet
+ * remove fake walls behind us as we travel along path
+ * stopping/turning sloppiness when not toward gold
+ * 
+ * maybe replan on the fly
  */
 
 package edu.cmu.ri.mrpl.example;
@@ -37,7 +37,6 @@ import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -47,10 +46,8 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
-import javax.swing.JFormattedTextField;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
-import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
@@ -78,26 +75,15 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 	private JButton connectButton;
 	private JButton disconnectButton;
 
-	private JButton pauseButton;
-	private JButton waitButton;
+	private JButton testCameraButton;
+	private JButton setupCommsButton;
 	private JButton gooButton;
-	private JButton goToButton;
-	private JButton poseToButton;
-	private JFormattedTextField argumentField;
-	private JTextField remainingField;
-	private JFormattedTextField xField;
-	private JFormattedTextField yField;
-	private JFormattedTextField thField;
 
 	private JButton stopButton;
 	private JButton quitButton;
-	private JButton executeButton;
-	private JButton loadMazeButton;
 	private JButton michaelPhelpsButton;
 
 	private java.util.LinkedList<Task> upcomingTasks;
-
-	static final int DEFAULT_ROOM_SIZE = 4;
 
 	final double DISTANCE_TOLERANCE = 0.01;
 	final double ANGLE_TOLERANCE = 0.01;
@@ -135,41 +121,21 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		connectButton = new JButton("connect");
 		disconnectButton = new JButton("disconnect");
 
-		pauseButton = new JButton("Test camera");
-		waitButton = new JButton("Setup comms");
+		testCameraButton = new JButton("Test camera");
+		setupCommsButton = new JButton("Setup comms");
 		gooButton = new JButton("GOOOOOO"); // was "Turn to angle!"
-		goToButton = new JButton("Go to distance!");
-		poseToButton = new JButton("twitch..."); // was "Go to pose!"
-		argumentField = new JFormattedTextField(NumberFormat.getInstance());
-		argumentField.setValue(1);
-		NumberFormat nf = NumberFormat.getInstance();
-		nf.setMaximumFractionDigits(2);
-		remainingField = new JTextField();
-		remainingField.setEditable(false);
-		xField = new JFormattedTextField(NumberFormat.getInstance());
-		xField.setValue(1);
-		yField = new JFormattedTextField(NumberFormat.getInstance());
-		yField.setValue(1);
-		thField = new JFormattedTextField(NumberFormat.getInstance());
-		thField.setValue(1);
 		stopButton = new JButton(">> stop <<");
 		quitButton = new JButton(">> quit <<");
-		executeButton = new JButton("Execute File");
-		loadMazeButton = new JButton("Load Maze File");
 		michaelPhelpsButton = new JButton("Michael Phelps");
 
 		connectButton.addActionListener(this);
 		disconnectButton.addActionListener(this);
 
-		pauseButton.addActionListener(this);
-		waitButton.addActionListener(this);
+		testCameraButton.addActionListener(this);
+		setupCommsButton.addActionListener(this);
 		gooButton.addActionListener(this);
-		goToButton.addActionListener(this);
-		poseToButton.addActionListener(this);
 		stopButton.addActionListener(this);
 		quitButton.addActionListener(this);
-		executeButton.addActionListener(this);
-		loadMazeButton.addActionListener(this);
 		michaelPhelpsButton.addActionListener(this);
 
 		Container main = getContentPane();
@@ -191,9 +157,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		box = Box.createHorizontalBox();
 		main.add(box);
 		box.add(Box.createHorizontalStrut(30));
-		box.add(pauseButton);
+		box.add(testCameraButton);
 		box.add(Box.createHorizontalStrut(30));
-		box.add(waitButton);
+		box.add(setupCommsButton);
 		box.add(Box.createHorizontalStrut(30));
 
 		main.add(Box.createVerticalStrut(30));
@@ -203,40 +169,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		box.add(Box.createHorizontalStrut(30));
 		box.add(gooButton);
 		box.add(Box.createHorizontalStrut(30));
-		box.add(goToButton);
-		box.add(Box.createHorizontalStrut(30));
-		box.add(poseToButton);
-		box.add(Box.createHorizontalStrut(30));
-
-		main.add(Box.createVerticalStrut(30));
-
-		box = Box.createHorizontalBox();
-		main.add(box);
-		box.add(executeButton);
-		box.add(Box.createHorizontalStrut(30));
-		box.add(loadMazeButton);
 
 		main.add(Box.createVerticalStrut(30));
 
 		box = Box.createHorizontalBox();
 		main.add(box);
 		box.add(michaelPhelpsButton);
-		
-		main.add(Box.createVerticalStrut(30));
-
-		box = Box.createHorizontalBox();
-		main.add(box);
-		box.add(Box.createHorizontalStrut(30));
-		box.add(argumentField);
-		box.add(Box.createHorizontalStrut(30));
-		box.add(remainingField);
-		box.add(Box.createHorizontalStrut(30));
-		box.add(xField);
-		box.add(Box.createHorizontalStrut(30));
-		box.add(yField);
-		box.add(Box.createHorizontalStrut(30));
-		box.add(thField);
-		box.add(Box.createHorizontalStrut(30));
 
 		main.add(Box.createVerticalStrut(30));
 
@@ -373,20 +311,24 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 		if (source==connectButton) {
 			connect();
-			waitButton.requestFocusInWindow();
+			if (HAS_PARTNER) {
+				setupCommsButton.requestFocusInWindow();
+			} else {
+				michaelPhelpsButton.requestFocusInWindow();
+			}
 		} else if ( source==disconnectButton ) {
 			disconnect();
 		} else if ( source==stopButton ) {
 			stop();
 		} else if ( source==quitButton ) {
 			quit();
-		} else if ( source==pauseButton ) {
+		} else if ( source==testCameraButton ) {
 //			upcomingTasks.add(new PauseTask(this));
 //			startUpcomingTasks();
 			UsbCamera cam = UsbCamera.getInstance();
 			
 			System.out.println("blue: "+checkForBlue(cam));
-		} else if ( source==waitButton ) {
+		} else if ( source==setupCommsButton ) {
 //			upcomingTasks.add(new WaitTask(this, argument));
 //			startUpcomingTasks();
 			michaelPhelpsButton.requestFocusInWindow();
@@ -451,22 +393,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					System.out.println(commands);
 					//java.util.List<RealPose2D> poses = MazeLocalizer.statesToPoses(states);
 					
-					// get initial heading correct
-					int i = 0;
-					double theta = 0;
-					while (i > -1) {
-						switch (commands.charAt(i++)) {
-						case 'G':
-							i = -1;
-							break;
-						case 'L':
-							theta += PI/2;
-							break;
-						case 'R':
-							theta -= PI/2;
-							break;
-						}
-					}
+					double theta = AngleMath.calculateTurnAngle(commands);
 					upcomingTasks.add(new TurnToTask(this, Angle.normalize(theta)));
 					
 					// follow the path
@@ -550,7 +477,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			//long startTime = System.currentTimeMillis();
 
 			// these only catch events on the specific object
-			pauseButton.addKeyListener(this);
+			testCameraButton.addKeyListener(this);
 			SampleRobotApp.this.addKeyListener(this);
 			SampleRobotApp.this.addMouseListener(this);
 
@@ -573,7 +500,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 		public void keyPressed(KeyEvent e) {
 			done = true;
-			pauseButton.removeKeyListener(this);
+			testCameraButton.removeKeyListener(this);
 			SampleRobotApp.this.removeKeyListener(this);
 		}
 
@@ -732,6 +659,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		
 		// used in Subtasks GOTO_GOLD_WALL, GO_FROM_GOLD_WALL
 		private MazeState goalState;
+		private MazeState lastState;
 		private boolean hasGold = false;
 		
 		// variables that are updated by the main taskRun loop before calling subtask methods
@@ -937,7 +865,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				}
 			}
 
-			remainingField.setText("");
 			robot.turnSonarsOff();
 		}
 		
@@ -956,14 +883,29 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 		}
 		
-		private void clearFakeWalls () {
+		private void clearFakeWall (MazeState s) {
 			if (!HAS_PARTNER) {
 				return;
 			}
+			messaging.sendAction(Messaging.Action.REMOVE_WALL, s);
+			fakeWalls.remove(s);
+		}
+		
+		private void clearFakeWalls () {
 			for (MazeState s : fakeWalls) {
-				messaging.sendAction(Messaging.Action.REMOVE_WALL, s);
+				clearFakeWall(s);
 			}
-			fakeWalls.clear();
+		}
+		
+		private void clearFakeWallsAround (MazeState s) {
+			int x = s.x();
+			int y = s.y();
+			Direction dir = s.dir();
+			do {
+				MazeState wall = new MazeState(x, y, dir);
+				clearFakeWall(wall);
+				dir = dir.left();
+			} while (dir != s.dir());
 		}
 		
 		private void fakeWall(MazeState s) {
@@ -1008,12 +950,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				break;
 				
 			case FOLLOWPATH_GOLD_CELL:
-				SoundExample.playClips("speed.wav");
-				currentBitchClip = moveBitchClip;
-				break;
-				
 			case FOLLOWPATH_DROP_CELL:
 				currentBitchClip = moveBitchClip;
+				lastState = MazeLocalizer.fromWorldToMazeState(curPose);
+				if (t == Subtask.FOLLOWPATH_GOLD_CELL) {
+					SoundExample.playClips("speed.wav");
+				}
 				break;
 				
 			case TURNTO_PATH:
@@ -1135,7 +1077,15 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						break;
 								
 					case GO_FROM_GOLD_WALL:
-						destAngle = Angle.normalize(curPose.getTh() + PI/2);
+						// figure out which way to turn to get to a drop,
+						// and start turning in that direction
+						mazeWorld.removeAllInits();
+						mazeWorld.addInit(goalState);
+						List<MazeState> states = new MazeSolver(mazeWorld).findPath(false);
+						String commands = MazeSolver.statesToCommandsString(states);
+						double turnAngle = AngleMath.calculateTurnAngle(commands);
+						System.out.printf("gold check turn angle: %.2f, path: %s \n", turnAngle, commands);
+						destAngle = Angle.normalize(curPose.getTh() + turnAngle);
 						transitionTo(Subtask.TURNTO_GOLD_CHECK);
 						break;
 					}
@@ -1304,6 +1254,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void followPath() {
+			// try to clean up behind self
+			MazeState curState = MazeLocalizer.fromWorldToMazeState(curPose);
+			if (lastState != curState) {
+				clearFakeWallsAround(lastState);
+				lastState = curState;
+			}
+			
 			final double Kp = 1;// switch between 1.2 and 2
 			RealPose2D correctedPoseRelStart = new RealPose2D(perceptor.getCorrectedPose().getX() - CELL_RADIUS, perceptor.getCorrectedPose().getY() - CELL_RADIUS, perceptor.getCorrectedPose().getTh());
 			RealPoint2D tmp = new RealPoint2D();
@@ -1438,9 +1395,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					//contBotList.get(2).pose.setPose(lookaheadPointRelWorld.getX(), lookaheadPointRelWorld.getY(), 0);
 				}
 			}
-			
-			remainingField.setText(String.format("(%.2f, %.2f, %.2f)",
-					correctedPosition.getX(), correctedPosition.getY(), (correctedPosition.getTh()+4)%4));
+
 			mazeGraphics.setContRobots(contBotList);
 			mazeGraphics.repaint();
 		}

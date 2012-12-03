@@ -54,6 +54,15 @@ public class MazeLocalizer {
 		return new RealPose2D(x, y, theta);
 	}
 	
+	public static MazeState fromWorldToMazeState (RealPose2D worldPose) {
+		RealPose2D cellPose = fromWorldToCell(worldPose);
+		int x = (int) round(cellPose.getX());
+		int y = (int) round(cellPose.getY());
+		int dirIndex = (int) round(cellPose.getTh());
+		Direction dir = Direction.values()[dirIndex];
+		return new MazeState(x, y, dir);
+	}
+	
 	public static RealPose2D fromMazeToWorld (RealPose2D cellPose) {
 		double x = cellPose.getX()*WALL_METERS + CELL_RADIUS;
 		double y = cellPose.getY()*WALL_METERS + CELL_RADIUS;

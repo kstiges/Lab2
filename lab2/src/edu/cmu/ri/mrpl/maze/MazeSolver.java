@@ -1,7 +1,5 @@
 package edu.cmu.ri.mrpl.maze;
 
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,10 +10,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-import javax.swing.JFileChooser;
-
 import edu.cmu.ri.mrpl.maze.MazeWorld.Direction;
-import edu.cmu.ri.mrpl.util.Pair;
 
 public class MazeSolver {
 	
