@@ -460,7 +460,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 
 			startUpcomingTasks();
 		} else if ( source==solveMazeButton ) {
-			turnToButton.requestFocusInWindow();
 			JFileChooser chooser = new MazeFileChooser();
 			int returnVal = chooser.showOpenDialog(this);
 			if(returnVal == JFileChooser.APPROVE_OPTION) {
@@ -521,6 +520,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				} catch (IOException e1) {
 					e1.printStackTrace();
 				}
+				
+				turnToButton.requestFocusInWindow();
+				this.requestFocus();
 			}
 		}
 	}
