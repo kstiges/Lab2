@@ -520,9 +520,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				} catch (IOException e1) {
 					e1.printStackTrace();
 				}
-				
-				turnToButton.requestFocusInWindow();
+
 				this.requestFocus();
+				turnToButton.requestFocusInWindow();
 			}
 		}
 	}
@@ -1232,7 +1232,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			RealPose2D lastPollPosition = perceptor.getCorrectedPose();
 			RealPose2D lastGradientPosition = perceptor.getCorrectedPose();
 			double pollInterval = 0.01; // meters between polling the sonars
-			double gradientInterval = 0.1; // meters between running gradient descent on points
+			double gradientInterval = 0.25; // meters between running gradient descent on points
 						
 			while(!shouldStop()) {
 				robot.updateState();
