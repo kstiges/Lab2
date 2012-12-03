@@ -332,7 +332,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 //			upcomingTasks.add(new WaitTask(this, argument));
 //			startUpcomingTasks();
 			michaelPhelpsButton.requestFocusInWindow();
-			comm = new CommClient("128.237.236.81");
+			String ipAddress = "128.237.231.235";
+			comm = new CommClient(ipAddress);
 			
 			//commclient test stuff
 			String myName = "SinNombre_" + IS_FIRST_PARTNER;
