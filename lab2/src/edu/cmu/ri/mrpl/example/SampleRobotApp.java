@@ -1,6 +1,6 @@
 /* XXX TODO
  * stopping/turning sloppiness when not toward gold
- * prioritize golds
+ * gold priorities finer-grained than ours/shared?
  * 
  * maybe replan on the fly
  */
@@ -63,7 +63,7 @@ import edu.cmu.ri.mrpl.util.GradientDescent.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
 
-	private boolean HAS_PARTNER = true;
+	private boolean HAS_PARTNER = false;
 	public static final boolean IS_FIRST_PARTNER = true;
 	
 	private Robot robot;
@@ -331,7 +331,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 //			upcomingTasks.add(new WaitTask(this, argument));
 //			startUpcomingTasks();
 			michaelPhelpsButton.requestFocusInWindow();
-			String ipAddress = "128.237.231.235";
+			String ipAddress = "128.237.234.186";
 			comm = new CommClient(ipAddress);
 			
 			//commclient test stuff
@@ -686,8 +686,6 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private double curTime;
 		private double lastTime;
 		private double destAngle;
-		private static final double ANGLE_TOLERANCE = 0.01;
-		private static final double SPEED_TOLERANCE = 0.01;
 		
 		// used in Subtask DROP_GOLD
 		private double dropStartTime;
@@ -1091,7 +1089,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 						mazeWorld.addInit(goalState);
 						List<MazeState> states = new MazeSolver(mazeWorld).findPath(false);
 						String commands = MazeSolver.statesToCommandsString(states);
-						double turnAngle = AngleMath.calculateTurnAngle(commands);
+						double turnAngle = commands == null ? PI/4 : AngleMath.calculateTurnAngle(commands);
 						System.out.printf("gold check turn angle: %.2f, path: %s \n", turnAngle, commands);
 						destAngle = Angle.normalize(curPose.getTh() + turnAngle);
 						transitionTo(Subtask.TURNTO_GOLD_CHECK);
@@ -1132,9 +1130,13 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			curTime = System.currentTimeMillis();
 			double angleErr = Angle.normalize(destAngle - curAngle);
 
+			double slopFactor = curSubtask == Subtask.TURNTO_GOLD ? 1 : 1.25;
+			double angleTolerance = 0.01 * slopFactor;
+			double speedTolerance = 0.01 * slopFactor;
+
 			// stop and transition if we're close enough
-			if (abs(angleErr) < ANGLE_TOLERANCE
-					&& abs(robot.getVelLeft()) < SPEED_TOLERANCE) {
+			if (abs(angleErr) < angleTolerance
+					&& abs(robot.getVelLeft()) < speedTolerance) {
 				controller.stop();
 				// transition to next state
 				if (perceptor.getSpeed() == 0) {
@@ -1277,8 +1279,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			Point2D destPointRelCur = correctedPoseRelStart.inverseTransform(tmp, null);
 			// transition to something if we're approaching the end of the path
 			double distToEnd = destPointRelCur.distance(new Point2D.Double());
+			double slopFactor = hasGold ? 1.25 : 1;
 			if (stopping || pathSegments.size() == 0 || (segment == pathSegments.size() - 1
-					&& distToEnd < 0.80*perceptor.getSpeed() || distToEnd < 0.05)) {
+					&& distToEnd < slopFactor*0.80*perceptor.getSpeed() || distToEnd < slopFactor*0.05)) {
 				//stopping = true;
 				controller.stop();
 				if (perceptor.getSpeed() == 0) {
