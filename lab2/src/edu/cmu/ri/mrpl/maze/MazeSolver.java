@@ -118,7 +118,7 @@ public class MazeSolver {
 			// if this is a goal position
 			if (isGoalState(world, current, findGold)) {
 				boolean isOurs = ourGolds.contains(current);
-				System.out.println(isOurs);
+				//System.out.println(isOurs);
 				// if we're going for a drop, go ahead and find the path to it
 				if (!isOurs) {
 					destState = current;
