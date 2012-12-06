@@ -852,7 +852,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					
 				case DROP_GOLD:
 					// handle this inline since it's so simple
-					if (System.currentTimeMillis() - dropStartTime > 5000) {
+					if (System.currentTimeMillis() - dropStartTime > 1000) {
 						transitionTo(Subtask.START);
 					}
 					break;
@@ -959,9 +959,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			case FOLLOWPATH_DROP_CELL:
 				currentBitchClip = moveBitchClip;
 				lastState = MazeLocalizer.fromWorldToMazeState(curPose);
-				if (t == Subtask.FOLLOWPATH_GOLD_CELL) {
-					SoundExample.playClips("speed.wav");
-				}
+//				if (t == Subtask.FOLLOWPATH_GOLD_CELL) {
+//					SoundExample.playClips("speed.wav");
+//				}
 				break;
 				
 			case TURNTO_PATH:
