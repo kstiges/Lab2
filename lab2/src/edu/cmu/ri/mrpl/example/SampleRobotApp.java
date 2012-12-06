@@ -817,7 +817,8 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					break;
 				}
 				
-				if (HAS_PARTNER) {
+				if (true) {
+				//if (HAS_PARTNER) {
 					try {
 						executeMessage();
 					} catch (CommException e) {
@@ -1307,6 +1308,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		private void executeMessage() throws CommException
 		{
 			String m;
+			try {
 			while ((m = comm.getIncomingMessage()) != null) {
 				Messaging.Action doThis = Messaging.Action.values()[Integer.parseInt(m)];
 				switch (doThis) {					
@@ -1337,6 +1339,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 					//speech.speak("me");
 					break;
 				}
+			}
+			} catch (Exception e) {
+				speech.speak("receive failed");
 			}
 		}
 
@@ -1376,9 +1381,9 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 		}
 		
 		private void transferCharge() {
-			if (!HAS_PARTNER) {
-				return;
-			}
+//			if (!HAS_PARTNER) {
+//				return;
+//			}
 			
 			double time = System.currentTimeMillis();
 			if (inCharge) {
