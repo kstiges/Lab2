@@ -63,7 +63,7 @@ import edu.cmu.ri.mrpl.util.GradientDescent.*;
 
 public class SampleRobotApp extends JFrame implements ActionListener, TaskController {
 
-	private boolean HAS_PARTNER = false;
+	private boolean HAS_PARTNER = true;
 	public static final boolean IS_FIRST_PARTNER = true;
 	
 	private Robot robot;
@@ -1391,7 +1391,21 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				// assume partner is AWOL, go to single player mode
 				HAS_PARTNER = false;
 				inCharge = true;
+				// remove fake walls
+				removeFakeWalls();
 				speech.speak("partner a wall");
+			}
+		}
+		
+		private void removeFakeWalls () {
+			for (int x = 0; x < mazeWorld.getWidth(); x++) {
+				for (int y = 0; y < mazeWorld.getHeight(); y++) {
+					for (Direction d : Direction.values()) {
+						if (!originalMazeWorld.isWall(x, y, d)) {
+							mazeWorld.removeWall(x, y, d);
+						}
+					}
+				}
 			}
 		}
 		
