@@ -819,12 +819,12 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 				
 				if (true) {
 				//if (HAS_PARTNER) {
-					try {
+//					try {
 						executeMessage();
-					} catch (CommException e) {
-						e.printStackTrace();
-						System.exit(1);
-					}
+//					} catch (CommException e) {
+//						e.printStackTrace();
+//						System.exit(1);
+//					}
 				}
 				
 				switch (curSubtask) {					
@@ -1305,7 +1305,7 @@ public class SampleRobotApp extends JFrame implements ActionListener, TaskContro
 			}
 		}
 		
-		private void executeMessage() throws CommException
+		private void executeMessage()
 		{
 			String m;
 			try {
